@@ -172,8 +172,8 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 			if ( this.moveBackward ) this.object.translateZ( actualMoveSpeed );
 			if ( this.moveLeft ) this.object.translateX( - actualMoveSpeed );
 			if ( this.moveRight ) this.object.translateX( actualMoveSpeed );
-			if ( this.moveUp ) this.object.translateY( actualMoveSpeed );
-			if ( this.moveDown ) this.object.translateY( - actualMoveSpeed );
+			if ( this.moveUp ) this.object.position.y += actualMoveSpeed ;
+			if ( this.moveDown ) this.object.position.y -= actualMoveSpeed;
 			actualLookSpeed = delta * this.lookSpeed;
 			if ( !this.activeLook || !this.isPointerLocked ) {
 				actualLookSpeed = 0;
