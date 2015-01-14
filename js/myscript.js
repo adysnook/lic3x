@@ -26,6 +26,9 @@ mygraph.addArc(mye5);
 console.log(mygraph.connectedComponents());
 
 
+myElem = document.createElement("div");
+myElem.style.cssText = "position:fixed; bottom:0px; left:0px; width:100px; height:100px; background-color:black; color: white;";
+
 
 
 var renderer	= new THREE.WebGLRenderer({
@@ -38,7 +41,7 @@ renderer.domElement.id="canvas";
 
 //var onRenderFcts= [];
 var scene	= new THREE.Scene();
-var camera	= new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+var camera	= new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.0001, 1000);
 camera.position.x = -12;
 camera.position.y = 1;
 camera.position.z = 0;
@@ -48,42 +51,44 @@ var controls = new THREE.FirstPersonControls( camera, renderer.domElement );
 controls.lookSpeed = 2;
 controls.noFly = false;
 controls.activeLook = true;
+controls.movementSpeed = 10;
 //////////////////////////////////////////////////////////////////////////////////
 //		set 3 point lighting						//
 //////////////////////////////////////////////////////////////////////////////////
 
 (function () {
     // add a ambient light
-    var light	= new THREE.AmbientLight( 0x202020 );
+    var light	= new THREE.AmbientLight( 0x404040 );
     scene.add( light );
     // add a light in front
-    var light	= new THREE.DirectionalLight('white', 5);
-    light.position.set(0.5, 0.0, 2);
+    var light	= new THREE.DirectionalLight('white', 0.7);
+    light.position.set(10, 40, 10);
     scene.add( light );
     // add a light behind
-    var light	= new THREE.DirectionalLight('white', 0.75*2);
-    light.position.set(-0.5, -0.5, -2);
+    var light	= new THREE.DirectionalLight('white', 0.7);
+    light.position.set(-10, 40, -10);
     scene.add( light );
 })();
 
 //////////////////////////////////////////////////////////////////////////////////
 //		add an object and make it move					//
 //////////////////////////////////////////////////////////////////////////////////
+
 var heightMap	= THREEx.Terrain.allocateHeightMap(256,256);
 // var heightMap	= THREEx.Terrain.allocateHeightMap(64,64)
 // var heightMap	= THREEx.Terrain.allocateHeightMap(4, 4)
 // var heightMap	= THREEx.Terrain.allocateHeightMap(16,256)
-//THREEx.Terrain.simplexHeightMap(heightMap)
-
+THREEx.Terrain.simplexHeightMap(heightMap)
+/*
 
 for(var ii1 = 0; ii1 < heightMap.length; ii1++){
     for(var ii2 = 0; ii2 < heightMap[0].length; ii2++){
-        heightMap[ii1][ii2] = 0.3;
+        heightMap[ii1][ii2] = 0.0;
     }
 }
 for(var ii1 = 80; ii1 < 150; ii1++){
     for(var ii2 = 80; ii2 < 150; ii2++){
-        heightMap[ii1][ii2] = 0.4;
+        heightMap[ii1][ii2] = 0.4+ii1/1500+3*ii2/1500;
     }
 }
 for(var ii1 = 100; ii1 < 200; ii1++){
@@ -93,19 +98,48 @@ for(var ii1 = 100; ii1 < 200; ii1++){
 }
 for(var ii1 = 130; ii1 < 200; ii1++){
     for(var ii2 = 100; ii2 < 150; ii2++){
-        heightMap[ii1][ii2] = 0.8;
+        heightMap[ii1][ii2] = 1.0;
     }
 }
 
 
-
+*/
 var geometry	= THREEx.Terrain.heightMapToPlaneGeometry(heightMap);
 
 THREEx.Terrain.heightMapToVertexColor(heightMap, geometry);
 
 
+/*
+var geometry = new THREE.Geometry();
+//geometry.vertices.push( new THREE.Vector3( 1, 1, 0 ) );
+var ix = 0;
+var iz = 0;
+var gridX = 1;
+var gridX1 = 2;
+var gridZ = 1;
+var normal = new THREE.Vector3( 0, 0, 1 );
+var a = ix + gridX1 * iz;
+var b = ix + gridX1 * ( iz + 1 );
+var c = ( ix + 1 ) + gridX1 * ( iz + 1 );
+var d = ( ix + 1 ) + gridX1 * iz;
+var uva = new THREE.Vector2( ix / gridX, 1 - iz / gridZ );
+var uvb = new THREE.Vector2( ix / gridX, 1 - ( iz + 1 ) / gridZ );
+var uvc = new THREE.Vector2( ( ix + 1 ) / gridX, 1 - ( iz + 1 ) / gridZ );
+var uvd = new THREE.Vector2( ( ix + 1 ) / gridX, 1 - iz / gridZ );
+var face = new THREE.Face3( a, b, d );
+face.normal.copy( normal );
+face.vertexNormals.push( normal.clone(), normal.clone(), normal.clone() );
+geometry.faces.push( face );
+geometry.faceVertexUvs[ 0 ].push( [ uva, uvb, uvd ] );
+face = new THREE.Face3( b, c, d );
+face.normal.copy( normal );
+face.vertexNormals.push( normal.clone(), normal.clone(), normal.clone() );
+geometry.faces.push( face );
+geometry.faceVertexUvs[ 0 ].push( [ uvb.clone(), uvc, uvd.clone() ] );
+*/
+//////////////////////////////////////////////////////
 
-var material	= new THREE.MeshPhongMaterial({
+var material	= new THREE.MeshLambertMaterial({
     shading		: THREE.FlatShading,
     vertexColors 	: THREE.VertexColors
 });
@@ -176,6 +210,7 @@ function animate(nowMsec){
     stats.update(fd, !controls.hideAll);
     controls.update(fd);
     renderer.render(scene, camera);
+	myElem.innerHTML = "x: "+Math.round(camera.position.x*100)/100+"<br>y: "+Math.round(camera.position.y*100)/100+"<br>z: "+Math.round(camera.position.z*100)/100;
     lastTimeMsec = nowMsec;
     requestAnimationFrame(animate);
 }
@@ -194,5 +229,6 @@ window.onresize = function(event){
 window.onload = function(e){
     document.body.appendChild(renderer.domElement);
     document.body.appendChild(stats.domElement);
+	document.body.appendChild(myElem);
     requestAnimationFrame(init);
 };
