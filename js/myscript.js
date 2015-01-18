@@ -1,3 +1,10 @@
+function randomInt(min, max){
+    return Math.floor(Math.random()*(max-min+1))+min;
+}
+function randomInterval(min, max){
+    return Math.random()*(max-min)+min;
+}
+
 var mygraph = new MYGRAPH.Graph();
 var myv1 = new MYGRAPH.Vertex("1", new THREE.Vector3(1,1,1), "1");
 var myv2 = new MYGRAPH.Vertex("2", new THREE.Vector3(2,3,4), "2");
@@ -105,10 +112,30 @@ for(var ii1 = 130; ii1 < 200; ii1++){
 
 */
 var geometry	= THREEx.Terrain.heightMapToPlaneGeometry(heightMap);
-
 THREEx.Terrain.heightMapToVertexColor(heightMap, geometry);
+/*
+var width	= heightMap.length;
+var depth	= heightMap[0].length;
+// loop on each vertex of the geometry
 
-
+for(var x = 0; x < width; x++){
+	for(var z = 0; z < depth; z++){
+		// get the height from heightMap
+		//var height	= heightMap[x][z];
+		// set the vertex.z to a normalized height
+		var vertex	= geometry.vertices[x + z * width];
+        //vertex.y *= 10;
+        //vertex.x *= 10;
+		//vertex.z	= (height-0.5)*2
+	}
+}
+// notify the geometry need to update vertices
+geometry.verticesNeedUpdate	= true;
+// notify the geometry need to update normals
+geometry.computeFaceNormals();
+geometry.computeVertexNormals();
+geometry.normalsNeedUpdate	= true;
+*/
 /*
 var geometry = new THREE.Geometry();
 //geometry.vertices.push( new THREE.Vector3( 1, 1, 0 ) );
@@ -149,10 +176,37 @@ var material	= new THREE.MeshLambertMaterial({
 var mesh	= new THREE.Mesh( geometry, material );
 scene.add( mesh );
 mesh.lookAt(new THREE.Vector3(0,1,0));
+/*
 mesh.scale.y	= 2;
 mesh.scale.x	= 2;
 mesh.scale.z	= 0.2;
 mesh.scale.multiplyScalar(10);
+*/
+var start_vertex;
+function generate_position(){
+    var start_x = randomInt(1, 254);
+    var start_z = randomInt(1, 254);
+    start_vertex = start_x + start_z*256;
+    return geometry.vertices[start_vertex].clone();
+}
+function find_positive_pos(){
+    do{
+        var pos = generate_position();
+    }while(pos.z<0);
+    return pos;
+}
+var sphere_geom = new THREE.SphereGeometry(0.1, 32, 32);
+var sphere_mat  = new THREE.MeshPhongMaterial( {color: 0xffff00} );
+var sphere = new THREE.Mesh( sphere_geom, sphere_mat );
+var sphere_pos = find_positive_pos();
+sphere.position.x = -sphere_pos.y;
+sphere.position.y = sphere_pos.z;
+sphere.position.z = -sphere_pos.x;
+camera.position = sphere.position.clone();
+camera.position.x -= 3;
+camera.position.y += 1;
+//camera.lookAt(sphere.position.clone());
+scene.add(sphere);
 
 /*
 onRenderFcts.push(function(delta, now){

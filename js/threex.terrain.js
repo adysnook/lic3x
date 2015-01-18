@@ -89,7 +89,7 @@ THREEx.Terrain.heightMapToPlaneGeometry	= function(heightMap){
 	var width	= heightMap.length;
 	var depth	= heightMap[0].length;
 	// build geometry
-	var geometry	= new THREEx.Terrain.PlaneGeometry( 1, 1, width-1, depth-1);
+	var geometry	= new THREEx.Terrain.PlaneGeometry( 100, 100, width-1, depth-1);
 	// loop on each vertex of the geometry
 	for(var x = 0; x < width; x++){
 		for(var z = 0; z < depth; z++){
@@ -97,7 +97,7 @@ THREEx.Terrain.heightMapToPlaneGeometry	= function(heightMap){
 			var height	= heightMap[x][z];
 			// set the vertex.z to a normalized height
 			var vertex	= geometry.vertices[x + z * width];
-			vertex.z	= (height-0.5)*2
+			vertex.z	= (height-0.5)*10;
 		}
 	}
 	// notify the geometry need to update vertices
