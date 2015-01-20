@@ -6,9 +6,9 @@ MYSTATS.Stats = function () {
     this.FPSHistory = new Array(60);
     this.showingFPS = true;
     this.domElement = document.createElement("div");
-    this.domElement.style.cssText = "width:100px;height:40px;position:fixed;left:0px;top:0px;opacity:0.9;background-color:black;";
+    this.domElement.style.cssText = "width:100px;height:40px;position:fixed;left:0px;top:0px;";
     this.graphElement = document.createElement("div");
-    this.graphElement.style.cssText = "width:70px;height:40px;opacity:0.9;";
+    this.graphElement.style.cssText = "width:70px;height:40px;";
     this.domElement.appendChild(this.graphElement);
 
     var obj = document.createElement("span");

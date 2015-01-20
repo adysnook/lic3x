@@ -89,7 +89,7 @@ THREEx.Terrain.heightMapToPlaneGeometry	= function(heightMap){
 	var width	= heightMap.length;
 	var depth	= heightMap[0].length;
 	// build geometry
-	var geometry	= new THREEx.Terrain.PlaneGeometry( 100, 100, width-1, depth-1);
+	var geometry	= new THREE.PlaneGeometry( 100, 100, width-1, depth-1);
 	// loop on each vertex of the geometry
 	for(var x = 0; x < width; x++){
 		for(var z = 0; z < depth; z++){
@@ -257,17 +257,17 @@ THREEx.Terrain.heightToColor	= (function(){
 	var color	= new THREE.Color();
 	return function(height){
 		// compute color based on height
-		if( height < 0.5 ){
-			height		= (height*2)*0.5 + 0.2;
-			color.setRGB(0,0, height)
-		}else if( height < 0.7 ){
-			height		= (height-0.5)/0.2;
-			height		= height*0.5 + 0.2;
-			color.setRGB(0,height, 0)
+		if( height < 0.41 ){
+			height		= height/0.41 + 0.3;
+			color.setRGB(0.2,0.2, 0.7);
+		}else if( height < 0.6 ){
+			height		= (height-0.41)/(0.6-0.41);
+			//height		= height*0.4 + 0.4;
+			color.setRGB(0.6-height*0.4,0.8-height*0.4, 0.4-height*0.2);
 		}else{
-			height		= (height-0.7)/0.3;
-			height		= height*0.5 + 0.5;
-			color.setRGB(height,height, height)
+			height		= (height-0.6)/(1-0.6);
+			//height		= height*0.3 + 0.7;
+			color.setRGB(height*0.4+0.6,height*0.5+0.5, height*0.6+0.4);
 		}
 		// color.setRGB(1,1,1)
 		return color;		
@@ -319,7 +319,7 @@ THREEx.Terrain.PlaneGeometry = function ( width, height, widthSegments, heightSe
 			var x = ix * segment_width - width_half;
 			var y = iz * segment_height - height_half;
 
-			this.vertices.push( new THREE.Vector3( x, - y, 0 ) );
+			this.vertices.push( new THREE.Vector3( x, -y, 0 ) );
 
 		}
 

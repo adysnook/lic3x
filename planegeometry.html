@@ -10,4 +10,24 @@
 	<script src='js/myscript.js'></script>
 </head>
 <body style='margin: 0px; background-color: #bbbbbb; overflow: hidden;'></body>
+	<div style="position: fixed; top: 0px; right: 0px; z-index: 1000; border: 1px solid white;">
+		<table style="color: white;">
+			<tr>
+				<td>
+					Algorithm:
+				</td>
+				<td>
+					<select id="algorithm_select" onchange="changeAlgorithm(this);">
+						<option value="0">Breadth-First Search</option>
+						<option value="1">Backward A*</option>
+					</select>
+				</td>
+			</tr>
+			<tr>
+				<td colspan="2" style="text-align: right">
+					<button onclick="stepAlgorithm(this);">Step</button>
+				</td>
+			</tr>
+		</table>
+	</div>
 </html>
