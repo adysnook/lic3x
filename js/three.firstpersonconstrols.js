@@ -65,11 +65,11 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 		this.movementSpeed*=2;
 	};
 	this.onPointerlockchange = function(event){
+		this.mouseX = this.mouseY = 0;
 		if (document.pointerLockElement === this.domElement ||
 			document.mozPointerLockElement === this.domElement ||
 			document.webkitPointerLockElement === this.domElement) {
 			// Pointer was just locked
-			this.mouseX = this.mouseY = 0;
 			this.isPointerLocked = true;
 		} else {
 			// Pointer was just unlocked
@@ -77,34 +77,40 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 		}
 	};
 	this.onMouseDown = function ( event ) {
+		/*
 		if(!this.isPointerLocked){
 			// Ask the browser to lock the pointer
 			this.domElement.requestPointerLock();
 			return;
 		}
+		*/
 		/*
 		if ( this.domElement !== document ) {
 			this.domElement.focus();
 		}*/
 		event.preventDefault();
 		event.stopPropagation();
+		/*
 		if ( this.activeLook ) {
 			switch ( event.button ) {
 				case 0: this.moveForward = true; break;
 				case 2: this.moveBackward = true; break;
 			}
 		}
+		*/
 		this.mouseDragOn = true;
 	};
 	this.onMouseUp = function ( event ) {
 		event.preventDefault();
 		event.stopPropagation();
+		/*
 		if ( this.activeLook ) {
 			switch ( event.button ) {
 				case 0: this.moveForward = false; break;
 				case 2: this.moveBackward = false; break;
 			}
 		}
+		*/
 		this.mouseDragOn = false;
 	};
 	this.onMouseMove = function ( event ) {
@@ -115,10 +121,10 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 		switch( event.keyCode ) {
 			case 17: /*CTRL*/ this.moveDown = true; break;
 			case 32: /*SPACE*/ this.moveUp = true; break;
-			case 37: /*left*/
-			case 38: /*up*/
-			case 39: /*right*/
-			case 40: /*down*/
+			case 37: /*left*/ this.moveLeft = true; break;
+			case 38: /*up*/ this.moveForward = true; break;
+			case 39: /*right*/ this.moveRight = true; break;
+			case 40: /*down*/ this.moveBackward = true; break;
 			case 65: /*A*/ this.moveLeft = true; break;
 			case 68: /*D*/ this.moveRight = true; break;
 			case 81: /*Q*/ this.freeze = !this.freeze; break;
@@ -138,10 +144,10 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 		switch( event.keyCode ) {
 			case 17: /*CTRL*/ this.moveDown = false; break;
 			case 32: /*SPACE*/ this.moveUp = false; break;
-			case 37: /*left*/
-			case 38: /*up*/
-			case 39: /*right*/
-			case 40: /*down*/
+			case 37: /*left*/ this.moveLeft = false; break;
+			case 38: /*up*/ this.moveForward = false; break;
+			case 39: /*right*/ this.moveRight = false; break;
+			case 40: /*down*/ this.moveBackward = false; break;
 			case 65: /*A*/ this.moveLeft = false; break;
 			case 68: /*D*/ this.moveRight = false; break;
 			case 83: /*S*/ this.moveBackward = false; break;
@@ -163,11 +169,7 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 			} else {
 				this.autoSpeedFactor = 0.0;
 			}
-			if(this.isPointerLocked) {
-				actualMoveSpeed = delta * this.movementSpeed;
-			}else{
-				actualMoveSpeed = 0;
-			}
+			actualMoveSpeed = delta * this.movementSpeed;
 			if ( this.moveForward || ( this.autoForward && !this.moveBackward ) ) this.object.translateZ( - ( actualMoveSpeed + this.autoSpeedFactor ) );
 			if ( this.moveBackward ) this.object.translateZ( actualMoveSpeed );
 			if ( this.moveLeft ) this.object.translateX( - actualMoveSpeed );
@@ -175,7 +177,7 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 			if ( this.moveUp ) this.object.position.y += actualMoveSpeed ;
 			if ( this.moveDown ) this.object.position.y -= actualMoveSpeed;
 			actualLookSpeed = delta * this.lookSpeed;
-			if ( !this.activeLook || !this.isPointerLocked ) {
+			if ( !this.activeLook || !this.mouseDragOn ) {
 				actualLookSpeed = 0;
 			}
 			this.lon += this.mouseX * actualLookSpeed;
@@ -213,8 +215,8 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 	this.domElement.addEventListener( 'mousemove', bind( this, this.onMouseMove ), false );
 	this.domElement.addEventListener( 'mousedown', bind( this, this.onMouseDown ), false );
 	this.domElement.addEventListener( 'mouseup', bind( this, this.onMouseUp ), false );
-	this.domElement.addEventListener( 'keydown', bind( this, this.onKeyDown ), false );
-	this.domElement.addEventListener( 'keyup', bind( this, this.onKeyUp ), false );
+	window.addEventListener( 'keydown', bind( this, this.onKeyDown ), false );
+	window.addEventListener( 'keyup', bind( this, this.onKeyUp ), false );
 	document.addEventListener( 'pointerlockchange', bind( this, this.onPointerlockchange ), false );
 	this.domElement.addEventListener( 'mozpointerlockchange', bind( this, this.onPointerlockchange ), false );
 	this.domElement.addEventListener( 'webkitpointerlockchange', bind( this, this.onPointerlockchange ), false );

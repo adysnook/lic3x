@@ -84,17 +84,15 @@ THREEx.Terrain.heightMapToCanvas	= function(heightMap, canvas){
  * @param  {Array} heightMap the heightmap
  * @return {THREE.Geometry}  the just built geometry
  */
-THREEx.Terrain.heightMapToPlaneGeometry	= function(heightMap){
+THREEx.Terrain.heightMapToPlaneGeometry	= function(heightMap, geometry){
 	// get heightMap dimensions
 	var width	= heightMap.length;
 	var depth	= heightMap[0].length;
-	// build geometry
-	var geometry	= new THREE.PlaneGeometry( 100, 100, width-1, depth-1);
 	// loop on each vertex of the geometry
 	for(var x = 0; x < width; x++){
 		for(var z = 0; z < depth; z++){
 			// get the height from heightMap
-			var height	= heightMap[x][z];
+			var height	= Math.max(heightMap[x][z], 0.4);
 			// set the vertex.z to a normalized height
 			var vertex	= geometry.vertices[x + z * width];
 			vertex.z	= (height-0.5)*10;
@@ -107,7 +105,6 @@ THREEx.Terrain.heightMapToPlaneGeometry	= function(heightMap){
 	geometry.computeVertexNormals();
 	geometry.normalsNeedUpdate	= true;
 	// return the just built geometry
-	return geometry
 };
 
 THREEx.Terrain.heightMapToHeight	= function(heightMap, x, z){
@@ -209,31 +206,24 @@ THREEx.Terrain.planeToHeightMapCoords0	= function(position, heightMap, planeMesh
 	return position;
 };
 
-/**
- * Set the vertex color for a THREE.Geometry based on a heightMap
- * 
- * @param  {Array} heightMap the heightmap
- * @param  {THREE.Geometry} geometry  the geometry to set
- */
 THREEx.Terrain.heightMapToVertexColor	= function(heightMap, geometry){
 	// get heightMap dimensions
 	var width	= heightMap.length;
 	var depth	= heightMap[0].length;
 	// loop on each vertex of the geometry
-	var color	= new THREE.Color();
 	for(var i = 0; i < geometry.faces.length; i++){
 		var face	= geometry.faces[i];
 		if( face instanceof THREE.Face4 ){
 			console.assert(face instanceof THREE.Face4);
-			face.vertexColors.push( vertexIdxToColor(face.a).clone() );
-			face.vertexColors.push( vertexIdxToColor(face.b).clone() );
-			face.vertexColors.push( vertexIdxToColor(face.c).clone() );
-			face.vertexColors.push( vertexIdxToColor(face.d).clone() )
+			face.vertexColors[0] = vertexIdxToColor(face.a).clone();
+			face.vertexColors[1] = vertexIdxToColor(face.b).clone();
+			face.vertexColors[2] = vertexIdxToColor(face.c).clone();
+			face.vertexColors[3] = vertexIdxToColor(face.d).clone();
 		}else if( face instanceof THREE.Face3 ){
 			console.assert(face instanceof THREE.Face3);
-			face.vertexColors.push( vertexIdxToColor(face.a).clone() );
-			face.vertexColors.push( vertexIdxToColor(face.b).clone() );
-			face.vertexColors.push( vertexIdxToColor(face.c).clone() )
+			face.vertexColors[0] = vertexIdxToColor(face.a).clone();
+			face.vertexColors[1] = vertexIdxToColor(face.b).clone();
+			face.vertexColors[2] = vertexIdxToColor(face.c).clone();
 		}else	console.assert(false)
 	}
 	geometry.colorsNeedUpdate	= true;
@@ -258,8 +248,8 @@ THREEx.Terrain.heightToColor	= (function(){
 	return function(height){
 		// compute color based on height
 		if( height < 0.41 ){
-			height		= height/0.41 + 0.3;
-			color.setRGB(0.2,0.2, 0.7);
+			height		= height/0.41;
+			color.setRGB(height*0.5+0.3,height*0.5+0.3,1-height*height*height*0.5);
 		}else if( height < 0.6 ){
 			height		= (height-0.41)/(0.6-0.41);
 			//height		= height*0.4 + 0.4;
