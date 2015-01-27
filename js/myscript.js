@@ -33,11 +33,11 @@ controls.movementSpeed = 10;
     var light = new THREE.AmbientLight(0x202020);
     scene.add(light);
     // add a light in front
-    var light = new THREE.DirectionalLight('white', 0.9);
+    var light = new THREE.DirectionalLight('white', 0.8);
     light.position.set(10, 40, 10);
     scene.add(light);
     // add a light behind
-    var light = new THREE.DirectionalLight('white', 0.7);
+    var light = new THREE.DirectionalLight('white', 0.4);
     light.position.set(-10, 40, -10);
     //scene.add( light );
 })();
@@ -214,22 +214,148 @@ point_end.object = sphere;
 point_end.vertexidx = sphere_pos.i + sphere_pos.j * 256;
 
 var graphDisplay = {
-
+    meshesByColor: new Map(),
+    linesByColor: new Map(),
+    linesByVerticesIndex: new Map(),
+    addLine: function (a, b, color) {
+        if (typeof color === "undefined") {
+            color = 0;
+        }
+        var line = this.findLineByIndexes(a, b);
+        if (line !== false) {
+            this.setLineColor(line, color);
+            return;
+        }
+        line = {a: a, b: b, color: color};
+        this.addLineToMesh(line);
+    },
+    findLineByIndexes: function (a, b) {
+        var x = this.linesByVerticesIndex.get(a);
+        if (typeof x === "undefined") {
+            return false;
+        }
+        var y = x.get(b);
+        if (typeof y === "undefined") {
+            return false;
+        }
+        return y;
+    },
+    removeLine: function (a, b) {
+        console.error("not implemented");
+        //find line
+        //remove line
+    },
+    setLineColor: function (line, hex) {
+        console.assert(line !== false, "line===false");
+        if (line.color == hex)
+            return;
+        this.removeLineFromMesh(line);
+        line.color = hex;
+        this.addLineToMesh(line);
+    },
+    addLineToMesh: function (line) {
+        var m = this.meshesByColor.get(line.color);
+        if (typeof m === "undefined") {
+            m = new THREE.Line(new THREE.Geometry(), new THREE.LineBasicMaterial({color: line.color}), THREE.LinePieces);
+            this.meshesByColor.set(line.color, m);
+            scene.add(m);
+        }
+        var a = line.a;
+        var b = line.b;
+        var v1 = new THREE.Vector3(-geometry.vertices[a].y, geometry.vertices[a].z + 0.05, -geometry.vertices[a].x);
+        var v2 = new THREE.Vector3(-geometry.vertices[b].y, geometry.vertices[b].z + 0.05, -geometry.vertices[b].x);
+        line.v1 = v1;
+        m.geometry.vertices.push(v1, v2);
+        m.geometry.verticesNeedUpdate = true;
+        scene.remove(m);
+        var m2 = new THREE.Line(new THREE.Geometry(), new THREE.LineBasicMaterial({color: line.color}), THREE.LinePieces);
+        this.meshesByColor.set(line.color, m2);
+        scene.add(m2);
+        for (i = 0; i < m.geometry.vertices.length; ++i) {
+            m2.geometry.vertices.push(m.geometry.vertices[i]);
+        }
+        m2.geometry.verticesNeedUpdate = true;
+        var x = this.linesByVerticesIndex.get(a);
+        if (typeof x === "undefined") {
+            x = new Map();
+            this.linesByVerticesIndex.set(a, x);
+        }
+        x.set(b, line);
+        x = this.linesByVerticesIndex.get(b);
+        if (typeof x === "undefined") {
+            x = new Map();
+            this.linesByVerticesIndex.set(b, x);
+        }
+        x.set(a, line);
+        var cs = this.linesByColor.get(line.color);
+        if (typeof cs === "undefined") {
+            cs = new Set();
+            this.linesByColor.set(line.color, cs);
+        }
+        cs.add(line);
+    },
+    removeLineFromMesh: function (line) {
+        var m = this.meshesByColor.get(line.color);
+        var lc = this.linesByColor.get(line.color);
+        if (typeof lc !== "undefined") {
+            lc.delete(line);
+            if (lc.size == 0) {
+                this.linesByColor.delete(line.color);
+            }
+        }
+        var a = line.a;
+        var b = line.b;
+        var x = this.linesByVerticesIndex.get(a);
+        if (typeof x !== "undefined") {
+            x.delete(b);
+            if (x.size == 0) {
+                this.linesByVerticesIndex.delete(a);
+            }
+        }
+        x = this.linesByVerticesIndex.get(b);
+        if (typeof x !== "undefined") {
+            x.delete(a);
+            if (x.size == 0) {
+                this.linesByVerticesIndex.delete(b);
+            }
+        }
+        if (typeof m !== "undefined") {
+            m.geometry.vertices.splice(m.geometry.vertices.indexOf(line.v1), 2);
+            m.geometry.verticesNeedUpdate = true;
+            if (m.geometry.vertices.length == 0) {
+                this.meshesByColor.delete(line.color);
+                scene.remove(m);
+            }
+        }
+    }
 };
+
+/*
+ var line_geom = new THREE.Geometry();
+ for(var i=0; i<this.known_e.length; ++i){
+ var a = this.known_v[this.known_e[i].a].g_v_idx;
+ var b = this.known_v[this.known_e[i].b].g_v_idx;
+ var v1 = new THREE.Vector3(-geometry.vertices[a].y, geometry.vertices[a].z, -geometry.vertices[a].x);
+ var v2 = new THREE.Vector3(-geometry.vertices[b].y, geometry.vertices[b].z, -geometry.vertices[b].x);
+ line_geom.vertices.push(v1, v2);
+ }
+ this.mesh = new THREE.Line(line_geom, new THREE.LineBasicMaterial({color: 0xff0000}), THREE.LinePieces);
+ scene.add(this.mesh);
+ */
 
 var Robot = function (start_index) {
     var robot = this;
     this.offset = 0.5;
     this.vision_range = 2;
     this.mesh_r = new THREE.SceneUtils.createMultiMaterialObject(new THREE.CylinderGeometry(0.2, 0, 1, 4, 4),
-        [new THREE.MeshBasicMaterial({color: 0xFF0000}), new THREE.MeshBasicMaterial({color: 0, wireframe: true, visible:false})]);
+        [new THREE.MeshBasicMaterial({color: 0xFF0000}), new THREE.MeshBasicMaterial({color: 0, wireframe: true, visible: false})]);
     this.mesh_r.position.x = -geometry.vertices[start_index].y;
     this.mesh_r.position.y = geometry.vertices[start_index].z + this.offset;
     this.mesh_r.position.z = -geometry.vertices[start_index].x;
 
     var sphere_range = new THREE.Mesh(new THREE.SphereGeometry(this.vision_range, 32, 32),
         new THREE.MeshPhongMaterial({color: 0xFF0000, wireframe: false, opacity: 0.3, transparent: true, side: THREE.DoubleSide}));
-    sphere_range.position.y = -this.offset-0.1;
+    sphere_range.position.y = -this.offset - 0.1;
     this.sphere_range = sphere_range;
     this.mesh_r.add(sphere_range);
     //sphere_range.parent = this.mesh;
@@ -260,15 +386,21 @@ var Robot = function (start_index) {
     controls_td.colSpan = "2";
     var controls_step = document.createElement("button");
     controls_step.innerText = "Step";
-    controls_step.onclick = function(){robot.stepAlgorithm();};
+    controls_step.onclick = function () {
+        robot.stepAlgorithm();
+    };
     controls_td.appendChild(controls_step);
     var controls_middleStep = document.createElement("button");
     controls_middleStep.innerText = "Middle Step";
-    controls_middleStep.onclick = function(){robot.middleStepAlgorithm();};
+    controls_middleStep.onclick = function () {
+        robot.middleStepAlgorithm();
+    };
     controls_td.appendChild(controls_middleStep);
     var controls_majorStep = document.createElement("button");
     controls_majorStep.innerText = "Find/Move";
-    controls_majorStep.onclick = function(){robot.majorStepAlgorithm();};
+    controls_majorStep.onclick = function () {
+        robot.majorStepAlgorithm();
+    };
     controls_td.appendChild(controls_majorStep);
     controls_tr.appendChild(controls_td);
     table.appendChild(controls_tr);
@@ -291,7 +423,9 @@ var Robot = function (start_index) {
     alg_sel_tr.appendChild(alg_sel_td_title);
     var alg_sel_td_val = document.createElement("td");
     var algs_dom = getAlgsDom();
-    algs_dom.onchange = function () {robot.algorithmIndex = this.selectedIndex;};
+    algs_dom.onchange = function () {
+        robot.algorithmIndex = this.selectedIndex;
+    };
     alg_sel_td_val.appendChild(algs_dom);
     alg_sel_tr.appendChild(alg_sel_td_val);
     table.appendChild(alg_sel_tr);
@@ -329,11 +463,11 @@ Robot.prototype = {
     get algorithm() {
         return this._algorithm;
     },
-    set totalTravel(count){
+    set totalTravel(count) {
         this._totalTravel = count;
-        this.totalTravelDom.innerText = ""+Math.floor(count*1000)/1000;
+        this.totalTravelDom.innerText = "" + Math.floor(count * 1000) / 1000;
     },
-    get totalTravel(){
+    get totalTravel() {
         return this._totalTravel;
     },
     reset: function () {
@@ -363,17 +497,20 @@ Robot.prototype = {
         }
         return k_idx;
     },
-    addEdge: function (a, b) {
+    addEdge: function (a, b, color) {
         if (this.findEdge(a, b) !== false) {
+            graphDisplay.addLine(this.known_v[a].g_v_idx, this.known_v[b].g_v_idx, color);
             return;
         }
         var ei = this.known_e.length;
-        this.known_e.push({a: a, b: b, line: this.createLine(a, b)});
+        this.known_e.push({a: a, b: b});
         this.known_v[a].neighbors.add(ei);
         this.known_v[b].neighbors.add(ei);
-        this.updateGeometry();
+        graphDisplay.addLine(this.known_v[a].g_v_idx, this.known_v[b].g_v_idx, color);
+        //this.updateGeometry();
     },
     createLine: function (a, b) {
+        console.error("deprecated");
         var u = this.known_v[a].g_v_idx;
         var v = this.known_v[b].g_v_idx;
         var line = createLine(u, v);
@@ -383,16 +520,29 @@ Robot.prototype = {
         return line;
     },
     updateGeometry: function () {
+        console.error("deprecated");
         if (this.mesh != null) {
             scene.remove(this.mesh);
             this.mesh = null;
         }
         if (this.known_e.length == 0)
             return;
-        this.mesh = new THREE.Object3D();
+        /*
+         this.mesh = new THREE.Object3D();
+         for (var i = 0; i < this.known_e.length; ++i) {
+         this.mesh.add(this.known_e[i].line);
+         }
+         */
+
+        var line_geom = new THREE.Geometry();
         for (var i = 0; i < this.known_e.length; ++i) {
-            this.mesh.add(this.known_e[i].line);
+            var a = this.known_v[this.known_e[i].a].g_v_idx;
+            var b = this.known_v[this.known_e[i].b].g_v_idx;
+            var v1 = new THREE.Vector3(-geometry.vertices[a].y, geometry.vertices[a].z, -geometry.vertices[a].x);
+            var v2 = new THREE.Vector3(-geometry.vertices[b].y, geometry.vertices[b].z, -geometry.vertices[b].x);
+            line_geom.vertices.push(v1, v2);
         }
+        this.mesh = new THREE.Line(line_geom, new THREE.LineBasicMaterial({color: 0xff0000}), THREE.LinePieces);
         scene.add(this.mesh);
     },
     findEdge: function (a, b) {
@@ -410,8 +560,9 @@ Robot.prototype = {
         return this.known_e[ei].a;
     },
     colorEdge: function (a, b, color) {
-        var ei = this.findEdge(a, b);
-        this.known_e[ei].line.material.color.setHex(color);
+        graphDisplay.addLine(a, b, color);
+        //var ei = this.findEdge(a, b);
+        //this.known_e[ei].line.material.color.setHex(color);
     },
     removeEdge: function (a, b) {
         var ei = this.findEdge(a, b);
@@ -430,33 +581,39 @@ Robot.prototype = {
             myarr.push({g_v: v, k_v: this.global2knownVertex(v)});
         }
         for (var i = 0; i < this.known_e.length; ++i) {
-            this.known_e[i].line.material.color.setHex(0x707070);
+            var a = this.known_v[this.known_e[i].a].g_v_idx;
+            var b = this.known_v[this.known_e[i].b].g_v_idx;
+            this.colorEdge(a, b, 0xA0A0A0);
+            4
         }
         for (var i = 0; i < vision.edges.length; ++i) {
             var a = this.global2knownVertex(vision.edges[i].a);
             var b = this.global2knownVertex(vision.edges[i].b);
-            this.addEdge(a, b);
-            var ei = this.findEdge(a, b);
-            this.known_e[ei].line.material.color.setHex(0x0000FF);
+            this.addEdge(a, b, 0x0000FF);
+            /*
+             this.addEdge(a, b);
+             var ei = this.findEdge(a, b);
+             this.known_e[ei].line.material.color.setHex(0x0000FF);
+             */
         }
     },
     stepAlgorithm: function () {
-        if(this.algorithm.state < 0)
+        if (this.algorithm.state < 0)
             return false;
         return this.algorithm.step();
     },
     middleStepAlgorithm: function () {
         var step = this.algorithm.middleStepCount;
-        var hasNext;
-        for (; this.algorithm.middleStepCount == step;) {
+        var hasNext = true;
+        for (; hasNext && this.algorithm.middleStepCount == step;) {
             hasNext = this.stepAlgorithm();
         }
         return hasNext;
     },
     majorStepAlgorithm: function () {
         var step = this.algorithm.majorStepCount;
-        var hasNext;
-        for (; this.algorithm.majorStepCount == step;) {
+        var hasNext = true;
+        for (; hasNext && this.algorithm.majorStepCount == step;) {
             hasNext = this.middleStepAlgorithm();
         }
         return hasNext;
@@ -562,7 +719,7 @@ algorithm_bfs.prototype = {
                         console.info("BFS: blocked!");
                         return false;
                     }
-                    return false;
+                    return true;
                 }
                 this.cq = this.queue.shift();
                 this.iter = this.robot.known_v[this.cq.ki].neighbors.values();
@@ -592,7 +749,7 @@ algorithm_bfs.prototype = {
                             this.state = 3;
                             this.pathrev = nq;
                         } else {
-                            this.robot.colorEdge(nq.ki, nq.prev.ki, 0x00FF00);
+                            this.robot.colorEdge(ngi, this.robot.known_v[nq.prev.ki].g_v_idx, 0x00FF00);
                             this.queue.push(nq);// /or update cost
                             this.visited.add(nq.ki);
                             if (this.bestF == null || this.robot.known_v[nki].h + nq.c < this.robot.known_v[this.bestF.ki].h + this.bestF.c) {
@@ -606,7 +763,7 @@ algorithm_bfs.prototype = {
             case 3:
                 var q, lq;
                 for (q = this.pathrev, lq = q; q.prev != null; lq = q, q = q.prev) {
-                    this.robot.colorEdge(q.ki, q.prev.ki, 0xFF0000);
+                    this.robot.colorEdge(this.robot.known_v[q.ki].g_v_idx, this.robot.known_v[q.prev.ki].g_v_idx, 0xFF0000);
                 }
                 this.move_to = lq.ki;
                 this.state = 4;
@@ -768,7 +925,7 @@ algorithm_dstar.prototype = {
                             this.state = 3;
                             this.pathrev = nq;
                         } else {
-                            this.robot.colorEdge(nq.ki, nq.prev.ki, 0x00FF00);
+                            this.robot.colorEdge(ngi, this.robot.known_v[nq.prev.ki].g_v_idx, 0x00FF00);
                             this.queue.push(nq);// /or update cost
                             this.visited.add(nq.ki);
                             if (this.bestF == null || this.robot.known_v[nki].h + nq.c < this.robot.known_v[this.bestF.ki].h + this.bestF.c) {
@@ -782,7 +939,7 @@ algorithm_dstar.prototype = {
             case 3:
                 var q, lq;
                 for (q = this.pathrev, lq = q; q.prev != null; lq = q, q = q.prev) {
-                    this.robot.colorEdge(q.ki, q.prev.ki, 0xFF0000);
+                    this.robot.colorEdge(this.robot.known_v[q.ki].g_v_idx, this.robot.known_v[q.prev.ki].g_v_idx, 0xFF0000);
                 }
                 this.move_to = lq.ki;
                 this.state = 4;
@@ -837,7 +994,7 @@ robot2.mesh_r.children[0].material.color.setHex(0x0000FF);
 robot2.mesh_r.children[0].scale.y = 2;
 robot2.mesh_r.children[1].scale.y = 2;
 robot2.mesh_r.position.y += robot2.offset;
-robot2.mesh_r.children[2].position.y -= robot2.offset+0.1;
+robot2.mesh_r.children[2].position.y -= robot2.offset + 0.1;
 robot2.mesh_r.children[2].material.color.setHex(0x0000FF);
 robot2.mesh_r.children[2].material.wireframe = true;
 robot2.offset = 1;
