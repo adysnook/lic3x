@@ -1,0 +1,28 @@
+D*
+S = set of vertices
+Succ(s) incl S = set of successors of vertex s of S
+Pred(s) incl S = set of predecessors of vertex s of S
+0 < c(s, s') <= infinity = cost from vertex s to vertex s' of Succ(s)
+s_start of S = start vertex
+s_goal of S = goal vertex
+h(s, s') = approx_distance(s, s')
+h(s_goal, s_goal) = 0
+h(s, s_goal) <= c(s, s') + h(s', s_goal), for all s of S and s' of Succ(s)
+g(s) = known distance from s_start to s
+rhs(s) = {
+ 0, if s = s_start
+ min(g(s') + c(s', s)), s' of Pred(s), otherwise
+}
+g*(s) = estimate of start distance (?)
+f(s) = g*(s) + h(s, s_goal)
+k1(s) = min(g(s), rhs(s)) + h(s, s_goal)
+k2(s) = min(g(s), rhs(s))
+k(s) = [k1(s), k2(s)]
+k(s1) <= k(s2) <=> (k1(s1)< k1(s2)) or (k1(s1)==k1(s2) and k2(s1)<=k2(s2))
+
+
+
+/**/
+CalcKey(s){
+	return [min(g(s), rhs(s)) + h(s_start, s) + k_m; min(g(s), rhs(s))];
+}

@@ -868,109 +868,26 @@ algorithm_dstar.prototype = {
     get totalStepCount() {
         return this._totalStepCount;
     },
-    reset: function (goal) {
-        this.init(goal);
+    resetGoal: function (goal) {
+        this(this.robot, goal);
     },
     step: function () {
         ++this.stepCount;
         ++this.totalStepCount;
         switch (this.state) {
             case 0:
-                this.queue = [];
-                this.visited = new Set();
-                var cq = {ki: this.robot.c_v_k_idx, c: 0, prev: null};
-                this.robot.known_v[cq.ki].h = Number.POSITIVE_INFINITY;
-                this.bestF = null;
-                this.queue.push(cq);
-                this.visited.add(cq.ki);
-                this.state = 1;
-                this.stepCount = 1;
-                return true;
-                break;
-            case 1:
-                if (this.queue.length == 0) {
-                    this.state = 3;
-                    this.pathrev = this.bestF;
-                    if (this.robot.known_v[this.bestF.ki].h + this.bestF.c == Number.POSITIVE_INFINITY) {
-                        console.info("BFS: blocked!");
-                        return false;
-                    }
-                    return false;
-                }
-                this.cq = this.queue.shift();
-                this.iter = this.robot.known_v[this.cq.ki].neighbors.values();
-                this.state = 2;
-                return true;
-                break;
-            case 2:
-                var next = this.iter.next();
-                if (next.done) {
-                    this.state = 1;
-                    ++this.middleStepCount;
-                } else {
-                    var nki = this.robot.neighborV(next.value, this.cq.ki);
-                    var ngi = this.robot.known_v[nki].g_v_idx;
-                    var cgi = this.robot.known_v[this.cq.ki].g_v_idx;
-                    var cost = edgeCost(cgi, ngi);
-                    var nq = {ki: nki, c: this.cq.c + cost, prev: this.cq};
-                    if (this.robot.known_v[nki].h != Number.POSITIVE_INFINITY) {
-                        var h = Number.POSITIVE_INFINITY;
-                        if (vision_range - nq.c <= 0.5) {
-                            h = this.vertexH(ngi);
-                        }
-                        this.robot.known_v[nki].h = h;
-                    }
-                    if (!this.visited.has(nki) && nq.c != Number.POSITIVE_INFINITY) {
-                        if (this.goal == ngi) {
-                            this.state = 3;
-                            this.pathrev = nq;
-                        } else {
-                            this.robot.colorEdge(ngi, this.robot.known_v[nq.prev.ki].g_v_idx, 0x00FF00);
-                            this.queue.push(nq);// /or update cost
-                            this.visited.add(nq.ki);
-                            if (this.bestF == null || this.robot.known_v[nki].h + nq.c < this.robot.known_v[this.bestF.ki].h + this.bestF.c) {
-                                this.bestF = nq;
-                            }
-                        }
-                    }
-                }
-                return true;
-                break;
-            case 3:
-                var q, lq;
-                for (q = this.pathrev, lq = q; q.prev != null; lq = q, q = q.prev) {
-                    this.robot.colorEdge(this.robot.known_v[q.ki].g_v_idx, this.robot.known_v[q.prev.ki].g_v_idx, 0xFF0000);
-                }
-                this.move_to = lq.ki;
-                this.state = 4;
-                ++this.middleStepCount;
-                ++this.majorStepCount;
-                return true;
-                break;
-            case 4:
-                this.robot.moveTo(this.move_to);
-                ++this.middleStepCount;
-                ++this.majorStepCount;
-                if (this.robot.known_v[this.move_to].g_v_idx == this.goal) {
-                    this.state = -2;
-                    console.info("BFS: finished (goal)");
-                    return false;
-                }
-                this.state = 0;//reset
+				this.state = -1;
                 return true;
                 break;
             default:
                 this.state = -1;
-                console.error("BFS: crashed");
+                console.error("D*: crashed");
                 return false;
                 break;
         }
     },
     vertexH: function (vidx) {
         return geometry.vertices[vidx].distanceTo(geometry.vertices[this.goal]);
-    },
-    checkVision: function (vidx) {
-        return geometry.vertices[this.robot.known_v[this.robot.c_v_k_idx].g_v_idx].distanceTo(geometry.vertices[vidx]) <= vision_range;
     }
 };
 var algorithms = [{class: algorithm_bfs, name: "Breadth-First Search"}, {class: algorithm_dstar, name: "D*"}];
