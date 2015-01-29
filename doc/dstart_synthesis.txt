@@ -20,9 +20,43 @@ k2(s) = min(g(s), rhs(s))
 k(s) = [k1(s), k2(s)]
 k(s1) <= k(s2) <=> (k1(s1)< k1(s2)) or (k1(s1)==k1(s2) and k2(s1)<=k2(s2))
 
+/**/
+class PriorityQueue{
+	var pq;
+	function Top(){
+		return vertex with smallest priority;
+	}
+	function TopKey(){
+		if(this.isEmpty){
+			return [infinity; infinity];
+		}
+		return samllest priority;
+	}
+	function Pop(){
+		var x = this.Top();
+		Remove(x);
+		return x;
+	}
+	function Insert(s, priority){
+		pq.insert(s, priority);
+	}
+	function Remove(s){
+		pq.remove(s);
+	}
+};
 
 
 /**/
 CalcKey(s){
 	return [min(g(s), rhs(s)) + h(s_start, s) + k_m; min(g(s), rhs(s))];
 }
+Initialize(){
+	U = new PriorityQueue();
+	k_m = 0;
+	for(s of S){
+		rhs[s] = g[s] = infinity;
+	}
+	rhs[s_goal] = 0;
+	U.Insert(s_goal, CalcKey(s_goal));
+}
+
