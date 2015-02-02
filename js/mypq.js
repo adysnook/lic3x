@@ -1,12 +1,12 @@
-var DoubleLinkedList = function(){
+var DoublyLinkedList = function(){
 	this.first = this.last = null;
 	this.length = 0;
 };
-DoubleLinkedList.prototype = {
-	constructor: DoubleLinkedList,
-	insertAfter: function(prev, node){
+DoublyLinkedList.prototype = {
+	constructor: DoublyLinkedList,
+	insertAfter: function(prev, info){
 		++this.length;
-		node.time = new Date().getTime();
+		var node = {info: info, time: new Date().getTime()};
 		if(prev == null){
 			node.prev = null;
 			node.next = this.first;
@@ -42,67 +42,78 @@ DoubleLinkedList.prototype = {
 		}
 	}
 };
-var PriorityQueue = function (){
-	this.list = new DoubleLinkedList();
-	this.vMap = new Map();
-	this.pMap = new Map();
-	this.pmList = new DoubleLinkedList();
+var PriorityQueue = function (priorityCompare){
+	this._rootList = new DoublyLinkedList();
+	this._compare = priorityCompare;
+	this._min = null;
 	this.length = 0;
 };
 PriorityQueue.prototype = {
 	constructor: PriorityQueue,
-	peek: function(){
-		if(this.list.length == 0){
-			throw "Priority Queue is empty";
+	insertUpdate: function(value, priority){
+		//if exists => change key
+		var node = {val: value, key: priority, rank: 0, children: [], mark: false, parent: null};
+		this._rootList.insertAfter(null, node);
+		var ln = this._rootList.first;
+		if(this._min == null || this._compare(node.key, this._min.info.key)){
+			this._min = ln;
 		}
-		return {v: this.list.first.v, p: this.list.first.p};
-		/*returns {v, p} order by (p, ins_time)*/
+		++this.length;
+	},
+	peek: function(){
+		return {value: this._min.info.val, priority: this._min.info.key};
 	},
 	pop: function(){
-		if(this.list.length == 0){
-			throw "Priority Queue is empty";
+		var ret = this.peek();
+		//delete min
+		this._rootList.remove(this._min);
+		//meld its children into root list
+		for(var i=0; i<this._min.info.children.length; ++i){
+			this._rootList.insertAfter(null, this._min.info.children[i]);
 		}
-		var x = this.list.first;
-		this.list.remove(x);
-		this.vMap.delete(x.v);
-		var px = this.pMap.get(x.p);
-		//TODO: pmList?
-		return {v: x.v, p: x.p};
-		/*returns {v, p} order by (p, ins_time) and removes it*/
-	},
-	push: function(v, p){
-		var w = this.vMap.get(v);
-		if(typeof w === "undefined"){
-			w = {v: v, p: p};
-			this.vMap.set(v, w);
-		}else{
-			if(w.p == p){
-				return;//no change
+		this._min.info.children = null;
+		//update min
+		var min = null;
+		for(var q=this._rootList.first; q!=null; q=q.next){
+			if(min == null || this._compare(q.info.key, min.info.key)){
+				min = q;
 			}
-			this.list.remove(w);
-			var y = this.pMap.get(w.p);//must exist
-			y.remove(w.pmw);
-			if(y.length == 0){
-				this.pMap.delete(w.p);
-				this.pmList.remove(y);
+		}
+		this._min = min;
+		//consolidate trees, no two roots have same rank
+		var rankArray = [];
+		for(var q=this._rootList.first; q!=null;){
+			if(typeof rankArray[q.info.rank] === "undefined" || rankArray[q.info.rank] == null){
+				rankArray[q.info.rank] = q;
+				q=q.next
+				continue;
 			}
-			w.p = p;
+			var qr = q.info.rank;
+			var lq = rankArray[q.info.rank];
+			var qi;
+			if(this._compare(q.info.key, lq.info.key)){
+				qi = q.info;
+				qi.children.push(lq.info);
+				lq.info.parent = qi;
+				qi.rank = ?? //TODO: ....
+			}else{
+				qi = lq.info;
+				qi.children.push(q.info);
+				q.info.parent = qi;
+			}
+			this._rootList.remove(lq);
+			q.info = qi;
+			rankArray[qr] = null;
 		}
-		var wp = {v: v, p: p, vmw: w};
-		w.pmw = wp;
-		var y = this.pMap.get(p);
-		var prevw = null;
-		if(typeof y === "undefined"){
-			y = new DoubleLinkedList();
-			this.pMap.set(p, y);
-			prevpm?
-			prevw = this.pmList.insertAfter(prevpm, y);
-		}else{
-			prevw = y.last.vmw;
-		}
-		y.insertAfter(y.last, wp);
-		this.list.insertAfter(prevw, w);
-		/*inserts {v, p}*/
+		--this.length;
+		return ret;
 	}
 };
-var testpq = new PriorityQueue();
+var testpq = new PriorityQueue(function(a, b){return a<b;});
+testpq.insertUpdate("a", 5);
+testpq.insertUpdate("b", 6);
+testpq.insertUpdate("c", 2);
+testpq.insertUpdate("d", 3);
+testpq.insertUpdate("e", 7);
+testpq.insertUpdate("f", 1);
+testpq.insertUpdate("g", 4);
