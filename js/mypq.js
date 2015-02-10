@@ -67,35 +67,54 @@ PriorityQueue.prototype = {
                 if (node.parent != null && this._compare(priority, node.parent.key)) {
                     //heap order violated
                     var p = node.parent;
+                    var q = node;
+                    /*
                     //cut tree rooted at node
                     p.children.remove(node.parentListNode);
                     node.parentListNode = null;
                     node.parent = null;
-                    //update rank?? TODO
+                    //update rank
+                    var rank = -1;
+                    for(var qi=p.children.first; qi!=null; qi=qi.next){
+                        if(rank<qi.info.rank){
+                            rank = qi.info.rank;
+                        }
+                    }
+                    ++rank;
+                    p.rank = rank;
                     //meld into root list
                     this._rootList.insertAfter(null, node);
                     var ln = this._rootList.first;
                     node.rootNode = ln;
                     //unmark
                     node.mark = false;
-                    var q = node;
-                    while (p.mark) {
-                        q = p;
-                        p = p.parent;
+                    */
+                    do{
                         //cut p
                         p.children.remove(q.parentListNode);
                         q.parentListNode = null;
                         q.parent = null;
+                        //update rank
+                        var rank = -1;
+                        for(var qi=p.children.first; qi!=null; qi=qi.next){
+                            if(rank<qi.info.rank){
+                                rank = qi.info.rank;
+                            }
+                        }
+                        ++rank;
+                        p.rank = rank;
                         //meld into root list
                         this._rootList.insertAfter(null, q);
                         q.rootNode = this._rootList.first;
                         //unmark
                         q.mark = false;
-                    }
-                    if (p.parent != null)
-                        p.mark = true;
+                        //next parent
+                        q = p;
+                        p = p.parent;
+                    } while (q.mark);
+                    if (p != null)
+                        q.mark = true;
                 }
-                this._rootList.log();
             } else {
                 //increase-key
             }
@@ -103,6 +122,7 @@ PriorityQueue.prototype = {
             if (this._compare(priority, this._min.key)) {
                 this._min = node;
             }
+            this._rootList.log();
             return;
         }
         var node = {val: value, key: priority, rank: 0, children: new DoublyLinkedList(), mark: false, parent: null};
@@ -181,21 +201,23 @@ PriorityQueue.prototype = {
         return ret;
     },
     toString: function () {
-        var obj = [];
+        var text = "";
         for (var q = this._rootList.first; q != null; q = q.next) {
-            obj.push(this.nodeToString(q.info));
+            text += this.nodeToString(q.info)+"\n";
         }
-        return obj;
+        return text;
     }
     ,
-    nodeToString: function (node) {
+    nodeToString: function (node, pre) {
+        if(pre == null)
+            pre = "";
         if (node == null)
             return;
-        var obj = [node.val, node.key, []];
+        var text = pre+node.key+"\n";
         for (var c = node.children.first; c != null; c = c.next) {
-            obj[2].push(this.nodeToString(c.info));
+            text += pre+this.nodeToString(c.info, pre+" ");
         }
-        return obj;
+        return text;
     }
 };
 var testpq = new PriorityQueue(function (a, b) {
@@ -218,3 +240,7 @@ testpq.insertUpdate("n", 11);
 testpq.insertUpdate("o", 9);
 testpq.insertUpdate("p", 12);
 testpq.insertUpdate("q", 5);
+testpq.pop();
+testpq.insertUpdate("g", 2);
+testpq.insertUpdate("d", 3);
+testpq.insertUpdate("c", 4);
