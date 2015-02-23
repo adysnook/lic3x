@@ -1,4 +1,5 @@
-THREE.FirstPersonControls = function ( object, domElement ) {
+THREE.FirstPersonControls = function ( object, domElement, pointPicker ) {
+    this.pointPicker = pointPicker;
 	this.object = object;
 	this.target = new THREE.Vector3( 0, 0, 0 );
 	this.domElement = ( domElement !== undefined ) ? domElement : document;
@@ -33,6 +34,8 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 	this.hideAll = false;
 	this.domElement.requestPointerLock = this.domElement.requestPointerLock || this.domElement.mozRequestPointerLock || this.domElement.webkitRequestPointerLock;
 	this.domElement.exitPointerLock = this.domElement.exitPointerLock || this.domElement.mozExitPointerLock || this.domElement.webkitExitPointerLock;
+    this.raycaster = new THREE.Raycaster();
+    this.mouse = new THREE.Vector2();
 	if ( this.domElement === document ) {
 		this.viewHalfX = window.innerWidth / 2;
 		this.viewHalfY = window.innerHeight / 2;
@@ -116,6 +119,8 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 	this.onMouseMove = function ( event ) {
 		this.mouseX += event.movementX;
 		this.mouseY += event.movementY;
+        this.mouse.x = ( event.clientX / this.domElement.width ) * 2 - 1;
+        this.mouse.y = - ( event.clientY / this.domElement.height ) * 2 + 1;
 	};
 	this.onKeyDown = function ( event ) {
 		switch( event.keyCode ) {
@@ -210,7 +215,36 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 		targetPosition.z = position.z + 100 * Math.sin( this.phi ) * Math.sin( this.theta );
 		this.object.lookAt( targetPosition );
 		this.mouseX = this.mouseY = 0;
-	};
+        this.raycaster.setFromCamera( this.mouse, this.object );
+        var intersects = this.raycaster.intersectObject( mesh );
+        // Toggle rotation bool for meshes that we clicked
+        if ( intersects.length > 0 ) {
+            this.pointPicker.position.set( 0, 0, 0 );
+            //helper.lookAt( intersects[ 0 ].face.normal );
+            //align to grid
+            var point = new THREE.Vector3();
+            point.x = -intersects[ 0 ].point.z;
+            point.y = -intersects[ 0 ].point.x;
+            point.z = intersects[ 0 ].point.y;
+            var distA = point.distanceTo(geometry.vertices[intersects[0].face.a]);
+            var distB = point.distanceTo(geometry.vertices[intersects[0].face.b]);
+            var distC = point.distanceTo(geometry.vertices[intersects[0].face.c]);
+            var posMin = "a";
+            var distMin = distA;
+            if(distMin>distB){
+                distMin = distB;
+                posMin = "b";
+            }
+            if(distMin>distC){
+                distMin = distC;
+                posMin = "c";
+            }
+            var toPos = geometry.vertices[intersects[0].face[posMin]];
+            this.pointPicker.position.x = -toPos.y;
+            this.pointPicker.position.y = toPos.z;
+            this.pointPicker.position.z = -toPos.x;
+        }
+    };
 	this.domElement.addEventListener( 'contextmenu', function ( event ) { event.preventDefault(); }, false );
 	this.domElement.addEventListener( 'mousemove', bind( this, this.onMouseMove ), false );
 	this.domElement.addEventListener( 'mousedown', bind( this, this.onMouseDown ), false );

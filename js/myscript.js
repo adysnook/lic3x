@@ -19,7 +19,17 @@ camera.position.y = 1;
 camera.position.z = 0;
 camera.lookAt(scene.position);
 
-var controls = new THREE.FirstPersonControls(camera, renderer.domElement);
+var pointPicker = null;
+{
+    var geom = new THREE.SphereGeometry(0.12, 32, 32);
+    //geom.applyMatrix( new THREE.Matrix4().makeTranslation( 0, 50, 0 ) );
+    //geom.applyMatrix( new THREE.Matrix4().makeRotationX( Math.PI / 2 ) );
+    //geom.applyMatrix( new THREE.Matrix4().makeRotationZ( Math.PI / 2 *3) );
+    pointPicker = new THREE.Mesh(geom, new THREE.MeshPhongMaterial({color: 0x0000FF}));
+}
+scene.add(pointPicker);
+
+var controls = new THREE.FirstPersonControls(camera, renderer.domElement, pointPicker);
 controls.lookSpeed = 5;
 controls.noFly = false;
 controls.activeLook = true;
@@ -986,6 +996,7 @@ function animate(nowMsec) {
         "<br>z: " +
         Math.round(camera.position.z * 100) /
         100;
+    robots_domElement.style.display = myElem.style.display = controls.hideAll ? "none" : "block";
     lastTimeMsec = nowMsec;
     requestAnimationFrame(animate);
 }
