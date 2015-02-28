@@ -41,88 +41,92 @@ DoublyLinkedList.prototype = {
             node.next.prev = node.prev;
         }
     },
-    log: function () {
+    toString: function () {
         var text = "";
         for (var q = this.first; q != null; q = q.next) {
             text += q.info.key + " ";
         }
-        console.log(text);
+        return text;
     }
 };
-var PriorityQueue = function (priorityCompare) {
+var PriorityQueue = function (priorityCompare) {//Fibonacci Heap
     this._rootList = new DoublyLinkedList();
-    this._compare = priorityCompare;
+    this._compare = priorityCompare;//A less B <=> true
     this._min = null;
     this._valMap = new Map();
     this.length = 0;
 };
 PriorityQueue.prototype = {
     constructor: PriorityQueue,
+    _cutChild: function(q){
+        if(q.parent == null)
+            return;
+        var p = q.parent;
+        do{
+            //cut q
+            p.children.remove(q.parentListNode);
+            q.parentListNode = null;
+            q.parent = null;
+            //update rank
+            var rank = -1;
+            for(var qi=p.children.first; qi!=null; qi=qi.next){
+                if(rank<qi.info.rank){
+                    rank = qi.info.rank;
+                }
+            }
+            ++rank;
+            p.rank = rank;
+            //meld into root list
+            this._rootList.insertAfter(null, q);
+            q.rootNode = this._rootList.first;
+            //unmark
+            q.mark = false;
+            //next parent
+            q = p;
+            p = p.parent;
+        } while (q.mark);
+        if (p != null)
+            q.mark = true;
+    },
+    _resetMin: function(){
+        var min = null;
+        for (var q = this._rootList.first; q != null; q = q.next) {
+            if (min == null || this._compare(q.info.key, min.info.key)) {
+                min = q;
+            }
+        }
+        if (min == null) {
+            this._min = null;
+        } else {
+            this._min = min.info;
+        }
+    },
     insertUpdate: function (value, priority) {
         //if exists change key
         if (typeof this._valMap.get(value) !== "undefined") {
             var node = this._valMap.get(value);
-            if (this._compare(priority, node.key)) {
+            var oldPriority = node.key;
+            node.key = priority;
+            if (this._compare(priority, oldPriority)) {
                 //decrease-key
                 if (node.parent != null && this._compare(priority, node.parent.key)) {
                     //heap order violated
-                    var p = node.parent;
-                    var q = node;
-                    /*
-                    //cut tree rooted at node
-                    p.children.remove(node.parentListNode);
-                    node.parentListNode = null;
-                    node.parent = null;
-                    //update rank
-                    var rank = -1;
-                    for(var qi=p.children.first; qi!=null; qi=qi.next){
-                        if(rank<qi.info.rank){
-                            rank = qi.info.rank;
-                        }
-                    }
-                    ++rank;
-                    p.rank = rank;
-                    //meld into root list
-                    this._rootList.insertAfter(null, node);
-                    var ln = this._rootList.first;
-                    node.rootNode = ln;
-                    //unmark
-                    node.mark = false;
-                    */
-                    do{
-                        //cut p
-                        p.children.remove(q.parentListNode);
-                        q.parentListNode = null;
-                        q.parent = null;
-                        //update rank
-                        var rank = -1;
-                        for(var qi=p.children.first; qi!=null; qi=qi.next){
-                            if(rank<qi.info.rank){
-                                rank = qi.info.rank;
-                            }
-                        }
-                        ++rank;
-                        p.rank = rank;
-                        //meld into root list
-                        this._rootList.insertAfter(null, q);
-                        q.rootNode = this._rootList.first;
-                        //unmark
-                        q.mark = false;
-                        //next parent
-                        q = p;
-                        p = p.parent;
-                    } while (q.mark);
-                    if (p != null)
-                        q.mark = true;
+                    this._cutChild(node);
+                }
+                if (this._compare(priority, this._min.key)) {
+                    this._min = node;
                 }
             } else {
                 //increase-key
+                for(var q=node.children.first; q!=null; q=q.next){
+                    if(this._compare(q.info.key, node.key)){//heap order violated
+                        this._cutChild(q.info);
+                    }
+                }
+                if(node.parent == null)
+                    this._resetMin();
             }
-            node.key = priority;
-            if (this._compare(priority, this._min.key)) {
-                this._min = node;
-            }
-            this._rootList.log();
+            //this._rootList.toString();
             return;
         }
         var node = {val: value, key: priority, rank: 0, children: new DoublyLinkedList(), mark: false, parent: null};
@@ -134,6 +138,21 @@ PriorityQueue.prototype = {
             this._min = node;
         }
         ++this.length;
+    },
+    deleteNode: function(value) {
+        if (typeof this._valMap.get(value) === "undefined") {
+            return;
+        }
+        var node = this._valMap.get(value);
+        for(var q=node.children.first; q!=null; q=q.next){
+            this._cutChild(q.info);
+        }
+        this._cutChild(node);
+        this._rootList.remove(node.rootNode);
+
+        if(this._min == node){
+            this._resetMin();
+        }
     },
     peek: function () {
         if (this.length == 0)
@@ -160,7 +179,7 @@ PriorityQueue.prototype = {
         for (var q = this._rootList.first; q != null;) {
             if (typeof rankArray[q.info.rank] === "undefined" || rankArray[q.info.rank] == null) {
                 rankArray[q.info.rank] = q;
-                q = q.next
+                q = q.next;
                 continue;
             }
             var qr = q.info.rank;
@@ -185,19 +204,9 @@ PriorityQueue.prototype = {
             q.info = qi;
             rankArray[qr] = null;
         }
-        //update min
-        var min = null;
-        for (var q = this._rootList.first; q != null; q = q.next) {
-            if (min == null || this._compare(q.info.key, min.info.key)) {
-                min = q;
-            }
-        }
-        if (min == null) {
-            this._min = null;
-        } else {
-            this._min = min.info;
-        }
         --this.length;
+        //update min
+        this._resetMin();
         return ret;
     },
     toString: function () {
@@ -223,6 +232,7 @@ PriorityQueue.prototype = {
 var testpq = new PriorityQueue(function (a, b) {
     return a < b;
 });
+/*
 testpq.insertUpdate("a", 1);
 testpq.insertUpdate("b", 14);
 testpq.insertUpdate("c", 12.5);
@@ -240,7 +250,45 @@ testpq.insertUpdate("n", 11);
 testpq.insertUpdate("o", 9);
 testpq.insertUpdate("p", 12);
 testpq.insertUpdate("q", 5);
-testpq.pop();
-testpq.insertUpdate("g", 2);
+var abcdef = testpq.pop();
+//console.log(abcdef.value+" "+abcdef.priority);
+//console.log(testpq.toString());
+
+//TEST decrease-key
+testpq.insertUpdate("h", 2);
 testpq.insertUpdate("d", 3);
 testpq.insertUpdate("c", 4);
+
+//TEST delete
+testpq.deleteNode("i");
+console.log(testpq.toString());
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+abcdef = testpq.pop();
+console.log(abcdef.value+" "+abcdef.priority);
+
+//testpq.insertUpdate("i", 9.31);
+//console.log(testpq.toString());
+*/

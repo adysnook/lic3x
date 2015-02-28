@@ -919,10 +919,9 @@ var robots_domElement = document.createElement("div");
 robots_domElement.style.cssText = "position: fixed; top: 0px; right: 0px; z-index: 1000;";
 robots_domElement.appendChild(robot1.domElement);
 robots_domElement.appendChild(robot2.domElement);
-function reset(elem) {
-    algorithm.reset(point_end.vertexidx);
-    robot1.mem.reset();
-}
+var info_domElement = document.createElement("div");
+info_domElement.style.cssText = "position: fixed; bottom: 0px; right: 0px; z-index: 1000; color: white";
+info_domElement.innerHTML = "<table><tr><td>Move</td><td>W A S D</td></tr><tr><td>Up</td><td>SPACE</td></tr><tr><td>Down</td><td>SHIFT</td></tr><tr><td>Camera</td><td>MOUSE</td></tr></table>";
 function blockRobot(robot, radius) {
     var gvidx = robot.mem.known_v[robot.mem.c_v_k_idx].g_v_idx;
     var gvi = robot.mem.known_v[robot.mem.c_v_k_idx].g_v_i;
@@ -1004,5 +1003,6 @@ window.onload = function (e) {
     document.body.appendChild(stats.domElement);
     document.body.appendChild(myElem);
     document.body.appendChild(robots_domElement);
+    document.body.appendChild(info_domElement);
     requestAnimationFrame(init);
 };

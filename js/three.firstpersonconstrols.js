@@ -119,7 +119,7 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 	};
 	this.onKeyDown = function ( event ) {
 		switch( event.keyCode ) {
-			case 17: /*CTRL*/ this.moveDown = true; break;
+			case 16: /*SHIFT*/ this.moveDown = true; break;
 			case 32: /*SPACE*/ this.moveUp = true; break;
 			case 37: /*left*/ this.moveLeft = true; break;
 			case 38: /*up*/ this.moveForward = true; break;
@@ -142,7 +142,7 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 	};
 	this.onKeyUp = function ( event ) {
 		switch( event.keyCode ) {
-			case 17: /*CTRL*/ this.moveDown = false; break;
+			case 16: /*SHIFT*/ this.moveDown = false; break;
 			case 32: /*SPACE*/ this.moveUp = false; break;
 			case 37: /*left*/ this.moveLeft = false; break;
 			case 38: /*up*/ this.moveForward = false; break;
