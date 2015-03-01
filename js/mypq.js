@@ -101,6 +101,9 @@ PriorityQueue.prototype = {
             this._min = min.info;
         }
     },
+    has: function (value) {
+        return (typeof this._valMap.get(value) !== "undefined");
+    },
     insertUpdate: function (value, priority) {
         //if exists change key
         if (typeof this._valMap.get(value) !== "undefined") {
