@@ -412,6 +412,12 @@ var Robot = function (start_index) {
         robot.majorStepAlgorithm();
     };
     controls_td.appendChild(controls_majorStep);
+    this.controls_pickGoal = document.createElement("button");
+    this.controls_pickGoal.innerText = "Pick Goal";
+    this.controls_pickGoal.onclick = function () {
+        robot.pickGoal();
+    };
+    controls_td.appendChild(this.controls_pickGoal);
     controls_tr.appendChild(controls_td);
     table.appendChild(controls_tr);
 
@@ -627,6 +633,26 @@ Robot.prototype = {
             hasNext = this.middleStepAlgorithm();
         }
         return hasNext;
+    },
+    pickGoal: function () {
+        controls.pickPoint(this);
+        this.controls_pickGoal.disabled = true;
+        this.controls_pickGoal.innerText = "Select point";
+        var robot = this;
+        this.controls_pickGoal.onclick = function () {
+            robot.pickFinish();
+        };
+    },
+    pointPicked: function (pointPicker) {
+        console.log(pointPicker);
+        this.controls_pickGoal.disabled = false;
+    },
+    pickFinish: function () {
+        controls.pickPoint();
+        this.controls_pickGoal.innerText = "Pick Goal";
+        this.controls_pickGoal.onclick = function () {
+            this.pickGoal();
+        };
     }
 };
 
@@ -931,7 +957,7 @@ robots_domElement.appendChild(robot1.domElement);
 robots_domElement.appendChild(robot2.domElement);
 var info_domElement = document.createElement("div");
 info_domElement.style.cssText = "position: fixed; bottom: 0px; right: 0px; z-index: 1000; color: white";
-info_domElement.innerHTML = "<table><tr><td>Move</td><td>W A S D</td></tr><tr><td>Up</td><td>SPACE</td></tr><tr><td>Down</td><td>SHIFT</td></tr><tr><td>Camera</td><td>MOUSE</td></tr></table>";
+info_domElement.innerHTML = "<table style='float: right;'><tr><td>Move</td><td>W A S D</td></tr><tr><td>Up</td><td>SPACE</td></tr><tr><td>Down</td><td>SHIFT</td></tr><tr><td>Camera</td><td>MOUSE</td></tr></table><br><div style='float:right;'>Sources at <a href=\"https://github.com/adysnook/lic3x\">https://github.com/adysnook/lic3x</a></div>";
 function blockRobot(robot, radius) {
     var gvidx = robot.mem.known_v[robot.mem.c_v_k_idx].g_v_idx;
     var gvi = robot.mem.known_v[robot.mem.c_v_k_idx].g_v_i;
@@ -983,7 +1009,7 @@ function animate(nowMsec) {
     var fd = frameDuration / 1000;
     stats.update(fd, !controls.hideAll);
     controls.update(fd);
-    autoPlayUpdate(nowMsec);
+    //autoPlayUpdate(nowMsec);
     renderer.render(scene, camera);
     myElem.innerHTML =
         "x: " +
