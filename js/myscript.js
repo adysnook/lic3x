@@ -926,7 +926,7 @@ algorithm_dstar.prototype = {
                 break;
             case 1:
                 var rStart = this.robot.known_v[this.s_start];
-                if(this.s_start == this.goal) {
+                if(this.s_start == this.s_goal) {
                     console.log("D*: finished (goal)");
                     this.state = -2;
                     return false;
@@ -934,19 +934,19 @@ algorithm_dstar.prototype = {
                 if(rStart.g == Number.POSITIVE_INFINITY){
                     console.info("D*: Blocked!");
                 }
-                var next = null;
+                var nextV = null;
                 var nextMin = null;
                 for(sPrim of rStart.neighbors){
                     var rsPrim = this.robot.known_v[sPrim];
                     var nowMin = this._c(this.s_start, sPrim)+rsPrim.g;
                     if(nextMin == null || nowMin<nextMin){
-                        next = sPrim;
+                        nextV = sPrim;
                         nextMin = nowMin;
                     }
                 }
                 this.updatedVertices = new Set();
                 this.state = 2;
-                this.robot.moveTo(next);
+                this.robot.moveTo(nextV);
                 this.stepCount = 1;
                 return true;
                 break;
@@ -959,15 +959,22 @@ algorithm_dstar.prototype = {
                 this.s_last = this.s_start;
                 this.iter = this.updatedVertices.values();
                 this.state = 3;
+                return true;
                 break;
             case 3:
                 var next = this.iter.next();
                 if (next.done) {
-                    this.state = 1;
+                    this.state = 4;
                     ++this.middleStepCount;
                 } else {
-                    var nki = this.robot.neighborV(next.value, this.cq.ki);
+                    this._updateVertex(next.value);
                 }
+                return true;
+                break;
+            case 4:
+                this._computeShortestPath();
+                this.state = 1;
+                return true;
                 break;
             default:
                 this.state = -1;
@@ -977,7 +984,7 @@ algorithm_dstar.prototype = {
         }
     },
     vertexH: function (vidx) {
-        return geometry.vertices[vidx].distanceTo(geometry.vertices[this.goal]);
+        return geometry.vertices[vidx].distanceTo(geometry.vertices[this.s_goal]);
     },
     edgeUpdated: function (ei) {
         var a = this.robot.known_e[ei].a;
@@ -993,16 +1000,17 @@ algorithm_dstar.prototype = {
         return [this._min(rs.g, rs.rhs)+this._h(this.s_start, s)+this.k_m, this._min(rs.g, rs.rhs)];
     },
     _init: function () {
+        this.s_goal = this.robot.global2knownVertex(this.goal);
         this.U = new PriorityQueue(this._compare);
         this.k_m = 0;
         for(var i=0; i<this.robot.known_v.length; ++i){
             this.robot.known_v[i].g = this.robot.known_v[i].rhs = Number.POSITIVE_INFINITY;
         }
-        this.U.insertUpdate(this.goal, this._calcKey(this.goal));
+        this.U.insertUpdate(this.s_goal, this._calcKey(this.s_goal));
     },
     _updateVertex: function (u) {
         var ru = this.robot.known_v[u];
-        if(u != this.goal){
+        if(u != this.s_goal){
             var minRHS = null;
             for(sPrim of ru.neighbors){
                 var rsPrim = this.robot.known_v[sPrim];
@@ -1037,16 +1045,10 @@ algorithm_dstar.prototype = {
                 }
             }else{
                 ru.g = Number.POSITIVE_INFINITY;
-                var includedU = false;
                 for(s of ru.neighbors){
-                    if(u==s){
-                        includedU = true;
-                    }
                     this._updateVertex(s);
                 }
-                if(!includedU){
-                    this._updateVertex(u);
-                }
+                this._updateVertex(u);
             }
         }
     },
@@ -1054,11 +1056,20 @@ algorithm_dstar.prototype = {
         return a[0]<b[0] || a[0]==b[0] && a[1]<b[1];
     },
     _h: function (a, b) {
-        return this._c(a, b);
+        var ra = this.robot.known_v[a];
+        var rb = this.robot.known_v[b];
+        var ga = geometry.vertices[ra.g_v_idx];
+        var gb = geometry.vertices[rb.g_v_idx];
+        return ga.distanceTo(gb);
     },
     _c: function (a, b) {
-        var ga = geometry.vertices[this.robot.known_v[a].g_v_idx];
-        var gb = geometry.vertices[this.robot.known_v[b].g_v_idx];
+        var ra = this.robot.known_v[a];
+        var rb = this.robot.known_v[b];
+        if(!ra.neighbors.has(rb)){
+            return Number.POSITIVE_INFINITY;
+        }
+        var ga = geometry.vertices[ra.g_v_idx];
+        var gb = geometry.vertices[rb.g_v_idx];
         return ga.distanceTo(gb);
     }
 };
