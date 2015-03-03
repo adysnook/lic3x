@@ -354,6 +354,7 @@ var graphDisplay = {
  */
 
 var Robot = function (start_index) {
+    this._goal = this._s_goal = null;
     var robot = this;
     this.offset = 0.5;
     this.vision_range = 2;
@@ -454,7 +455,13 @@ Robot.prototype = {
     constructor: Robot,
     _algorithm: null,
     set goal(vidx) {
+        if (this._s_goal != null) {
+            this.known_v[this._s_goal].neighbors = new Set();
+        }
         this._goal = vidx;
+        this._s_goal = this.global2knownVertex(vidx);
+        this.updateVision();
+
         if (this.algorithmIndex != null)
             this.algorithm = new (algorithms[this.algorithmIndex].class)(this, vidx);
     },
@@ -593,25 +600,36 @@ Robot.prototype = {
         console.warn("removing edge references and line from scene. edge vector index not removed.");
     },
     updateVision: function () {
-        var vision = computeVertexVision(this.known_v[this.c_v_k_idx].g_v_idx);
+        var gsi = this.known_v[this.c_v_k_idx].g_v_idx;
+        var gs = geometry.vertices[gsi];
+        var vision = computeVertexVision(gsi);
         var myarr = [];
         for (v of vision.vertices) {
             myarr.push({g_v: v, k_v: this.global2knownVertex(v)});
         }
         for (var i = 0; i < this.known_e.length; ++i) {
-            var a = this.known_v[this.known_e[i].a].g_v_idx;
-            var b = this.known_v[this.known_e[i].b].g_v_idx;
-            this.colorEdge(a, b, 0xA0A0A0);
+            var ga = this.known_v[this.known_e[i].a].g_v_idx;
+            var gb = this.known_v[this.known_e[i].b].g_v_idx;
+            this.colorEdge(ga, gb, 0xA0A0A0);
         }
         for (var i = 0; i < vision.edges.length; ++i) {
-            var a = this.global2knownVertex(vision.edges[i].a);
-            var b = this.global2knownVertex(vision.edges[i].b);
+            var ga = vision.edges[i].a;
+            var gb = vision.edges[i].b;
+            var a = this.global2knownVertex(ga);
+            var b = this.global2knownVertex(gb);
             this.addEdge(a, b, 0x0000FF);
             /*
              this.addEdge(a, b);
              var ei = this.findEdge(a, b);
              this.known_e[ei].line.material.color.setHex(0x0000FF);
              */
+        }
+        if(this._s_goal != null) {
+            for (var i = 0; i < myarr.length; ++i) {//goal imaginary edges
+                if (vision_range - gs.distanceTo(geometry.vertices[myarr[i].g_v]) < 0.5) {
+                    this.known_v[this._s_goal].neighbors.add(myarr[i].k_v);
+                }
+            }
         }
     },
     stepAlgorithm: function () {
@@ -984,7 +1002,7 @@ algorithm_dstar.prototype = {
         }
     },
     vertexH: function (vidx) {
-        return geometry.vertices[vidx].distanceTo(geometry.vertices[this.s_goal]);
+        return geometry.vertices[vidx].distanceTo(geometry.vertices[this.goal]);
     },
     edgeUpdated: function (ei) {
         var a = this.robot.known_e[ei].a;
@@ -1006,6 +1024,7 @@ algorithm_dstar.prototype = {
         for(var i=0; i<this.robot.known_v.length; ++i){
             this.robot.known_v[i].g = this.robot.known_v[i].rhs = Number.POSITIVE_INFINITY;
         }
+        this.robot.known_v[this.s_goal].rhs = 0;
         this.U.insertUpdate(this.s_goal, this._calcKey(this.s_goal));
     },
     _updateVertex: function (u) {
@@ -1063,13 +1082,18 @@ algorithm_dstar.prototype = {
         return ga.distanceTo(gb);
     },
     _c: function (a, b) {
+        if(a==b){
+            return 0;
+        }
         var ra = this.robot.known_v[a];
         var rb = this.robot.known_v[b];
-        if(!ra.neighbors.has(rb)){
-            return Number.POSITIVE_INFINITY;
-        }
         var ga = geometry.vertices[ra.g_v_idx];
         var gb = geometry.vertices[rb.g_v_idx];
+        //var gs = geometry.vertices[this.robot.known_v[this.robot.c_v_k_idx].g_v_idx];
+        if(!ra.neighbors.has(b)){
+            return Number.POSITIVE_INFINITY;
+        }
+
         return ga.distanceTo(gb);
     }
 };
