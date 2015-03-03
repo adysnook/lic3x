@@ -62,7 +62,7 @@ MYSTATS.Stats.prototype = {
             } else {
                 this.domElement.style.display = "none";
             }
-            showingFPS = show;
+            this.showingFPS = show;
         }
         fps = Math.round(fps);
         var now = window.performance.now();

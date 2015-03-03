@@ -19,7 +19,17 @@ camera.position.y = 1;
 camera.position.z = 0;
 camera.lookAt(scene.position);
 
-var controls = new THREE.FirstPersonControls(camera, renderer.domElement);
+var pointPicker = null;
+{
+    var geom = new THREE.SphereGeometry(0.12, 32, 32);
+    //geom.applyMatrix( new THREE.Matrix4().makeTranslation( 0, 50, 0 ) );
+    //geom.applyMatrix( new THREE.Matrix4().makeRotationX( Math.PI / 2 ) );
+    //geom.applyMatrix( new THREE.Matrix4().makeRotationZ( Math.PI / 2 *3) );
+    pointPicker = new THREE.Mesh(geom, new THREE.MeshPhongMaterial({color: 0x0000FF}));
+}
+scene.add(pointPicker);
+
+var controls = new THREE.FirstPersonControls(camera, renderer.domElement, pointPicker);
 controls.lookSpeed = 5;
 controls.noFly = false;
 controls.activeLook = true;
@@ -33,11 +43,11 @@ controls.movementSpeed = 10;
     var light = new THREE.AmbientLight(0x202020);
     scene.add(light);
     // add a light in front
-    var light = new THREE.DirectionalLight('white', 0.9);
+    var light = new THREE.DirectionalLight('white', 0.8);
     light.position.set(10, 40, 10);
     scene.add(light);
     // add a light behind
-    var light = new THREE.DirectionalLight('white', 0.7);
+    var light = new THREE.DirectionalLight('white', 0.4);
     light.position.set(-10, 40, -10);
     //scene.add( light );
 })();
@@ -214,22 +224,148 @@ point_end.object = sphere;
 point_end.vertexidx = sphere_pos.i + sphere_pos.j * 256;
 
 var graphDisplay = {
-
+    meshesByColor: new Map(),
+    linesByColor: new Map(),
+    linesByVerticesIndex: new Map(),
+    addLine: function (a, b, color) {
+        if (typeof color === "undefined") {
+            color = 0;
+        }
+        var line = this.findLineByIndexes(a, b);
+        if (line !== false) {
+            this.setLineColor(line, color);
+            return;
+        }
+        line = {a: a, b: b, color: color};
+        this.addLineToMesh(line);
+    },
+    findLineByIndexes: function (a, b) {
+        var x = this.linesByVerticesIndex.get(a);
+        if (typeof x === "undefined") {
+            return false;
+        }
+        var y = x.get(b);
+        if (typeof y === "undefined") {
+            return false;
+        }
+        return y;
+    },
+    removeLine: function (a, b) {
+        console.error("not implemented");
+        //find line
+        //remove line
+    },
+    setLineColor: function (line, hex) {
+        console.assert(line !== false, "line===false");
+        if (line.color == hex)
+            return;
+        this.removeLineFromMesh(line);
+        line.color = hex;
+        this.addLineToMesh(line);
+    },
+    addLineToMesh: function (line) {
+        var m = this.meshesByColor.get(line.color);
+        if (typeof m === "undefined") {
+            m = new THREE.Line(new THREE.Geometry(), new THREE.LineBasicMaterial({color: line.color}), THREE.LinePieces);
+            this.meshesByColor.set(line.color, m);
+            scene.add(m);
+        }
+        var a = line.a;
+        var b = line.b;
+        var v1 = new THREE.Vector3(-geometry.vertices[a].y, geometry.vertices[a].z + 0.05, -geometry.vertices[a].x);
+        var v2 = new THREE.Vector3(-geometry.vertices[b].y, geometry.vertices[b].z + 0.05, -geometry.vertices[b].x);
+        line.v1 = v1;
+        m.geometry.vertices.push(v1, v2);
+        m.geometry.verticesNeedUpdate = true;
+        scene.remove(m);
+        var m2 = new THREE.Line(new THREE.Geometry(), new THREE.LineBasicMaterial({color: line.color}), THREE.LinePieces);
+        this.meshesByColor.set(line.color, m2);
+        scene.add(m2);
+        for (i = 0; i < m.geometry.vertices.length; ++i) {
+            m2.geometry.vertices.push(m.geometry.vertices[i]);
+        }
+        m2.geometry.verticesNeedUpdate = true;
+        var x = this.linesByVerticesIndex.get(a);
+        if (typeof x === "undefined") {
+            x = new Map();
+            this.linesByVerticesIndex.set(a, x);
+        }
+        x.set(b, line);
+        x = this.linesByVerticesIndex.get(b);
+        if (typeof x === "undefined") {
+            x = new Map();
+            this.linesByVerticesIndex.set(b, x);
+        }
+        x.set(a, line);
+        var cs = this.linesByColor.get(line.color);
+        if (typeof cs === "undefined") {
+            cs = new Set();
+            this.linesByColor.set(line.color, cs);
+        }
+        cs.add(line);
+    },
+    removeLineFromMesh: function (line) {
+        var m = this.meshesByColor.get(line.color);
+        var lc = this.linesByColor.get(line.color);
+        if (typeof lc !== "undefined") {
+            lc.delete(line);
+            if (lc.size == 0) {
+                this.linesByColor.delete(line.color);
+            }
+        }
+        var a = line.a;
+        var b = line.b;
+        var x = this.linesByVerticesIndex.get(a);
+        if (typeof x !== "undefined") {
+            x.delete(b);
+            if (x.size == 0) {
+                this.linesByVerticesIndex.delete(a);
+            }
+        }
+        x = this.linesByVerticesIndex.get(b);
+        if (typeof x !== "undefined") {
+            x.delete(a);
+            if (x.size == 0) {
+                this.linesByVerticesIndex.delete(b);
+            }
+        }
+        if (typeof m !== "undefined") {
+            m.geometry.vertices.splice(m.geometry.vertices.indexOf(line.v1), 2);
+            m.geometry.verticesNeedUpdate = true;
+            if (m.geometry.vertices.length == 0) {
+                this.meshesByColor.delete(line.color);
+                scene.remove(m);
+            }
+        }
+    }
 };
+
+/*
+ var line_geom = new THREE.Geometry();
+ for(var i=0; i<this.known_e.length; ++i){
+ var a = this.known_v[this.known_e[i].a].g_v_idx;
+ var b = this.known_v[this.known_e[i].b].g_v_idx;
+ var v1 = new THREE.Vector3(-geometry.vertices[a].y, geometry.vertices[a].z, -geometry.vertices[a].x);
+ var v2 = new THREE.Vector3(-geometry.vertices[b].y, geometry.vertices[b].z, -geometry.vertices[b].x);
+ line_geom.vertices.push(v1, v2);
+ }
+ this.mesh = new THREE.Line(line_geom, new THREE.LineBasicMaterial({color: 0xff0000}), THREE.LinePieces);
+ scene.add(this.mesh);
+ */
 
 var Robot = function (start_index) {
     var robot = this;
     this.offset = 0.5;
     this.vision_range = 2;
     this.mesh_r = new THREE.SceneUtils.createMultiMaterialObject(new THREE.CylinderGeometry(0.2, 0, 1, 4, 4),
-        [new THREE.MeshBasicMaterial({color: 0xFF0000}), new THREE.MeshBasicMaterial({color: 0, wireframe: true, visible:false})]);
+        [new THREE.MeshBasicMaterial({color: 0xFF0000}), new THREE.MeshBasicMaterial({color: 0, wireframe: true, visible: false})]);
     this.mesh_r.position.x = -geometry.vertices[start_index].y;
     this.mesh_r.position.y = geometry.vertices[start_index].z + this.offset;
     this.mesh_r.position.z = -geometry.vertices[start_index].x;
 
     var sphere_range = new THREE.Mesh(new THREE.SphereGeometry(this.vision_range, 32, 32),
         new THREE.MeshPhongMaterial({color: 0xFF0000, wireframe: false, opacity: 0.3, transparent: true, side: THREE.DoubleSide}));
-    sphere_range.position.y = -this.offset-0.1;
+    sphere_range.position.y = -this.offset - 0.1;
     this.sphere_range = sphere_range;
     this.mesh_r.add(sphere_range);
     //sphere_range.parent = this.mesh;
@@ -260,16 +396,28 @@ var Robot = function (start_index) {
     controls_td.colSpan = "2";
     var controls_step = document.createElement("button");
     controls_step.innerText = "Step";
-    controls_step.onclick = function(){robot.stepAlgorithm();};
+    controls_step.onclick = function () {
+        robot.stepAlgorithm();
+    };
     controls_td.appendChild(controls_step);
     var controls_middleStep = document.createElement("button");
     controls_middleStep.innerText = "Middle Step";
-    controls_middleStep.onclick = function(){robot.middleStepAlgorithm();};
+    controls_middleStep.onclick = function () {
+        robot.middleStepAlgorithm();
+    };
     controls_td.appendChild(controls_middleStep);
     var controls_majorStep = document.createElement("button");
     controls_majorStep.innerText = "Find/Move";
-    controls_majorStep.onclick = function(){robot.majorStepAlgorithm();};
+    controls_majorStep.onclick = function () {
+        robot.majorStepAlgorithm();
+    };
     controls_td.appendChild(controls_majorStep);
+    this.controls_pickGoal = document.createElement("button");
+    this.controls_pickGoal.innerText = "Pick Goal";
+    this.controls_pickGoal.onclick = function () {
+        robot.pickGoal();
+    };
+    controls_td.appendChild(this.controls_pickGoal);
     controls_tr.appendChild(controls_td);
     table.appendChild(controls_tr);
 
@@ -291,7 +439,9 @@ var Robot = function (start_index) {
     alg_sel_tr.appendChild(alg_sel_td_title);
     var alg_sel_td_val = document.createElement("td");
     var algs_dom = getAlgsDom();
-    algs_dom.onchange = function () {robot.algorithmIndex = this.selectedIndex;};
+    algs_dom.onchange = function () {
+        robot.algorithmIndex = this.selectedIndex;
+    };
     alg_sel_td_val.appendChild(algs_dom);
     alg_sel_tr.appendChild(alg_sel_td_val);
     table.appendChild(alg_sel_tr);
@@ -329,11 +479,11 @@ Robot.prototype = {
     get algorithm() {
         return this._algorithm;
     },
-    set totalTravel(count){
+    set totalTravel(count) {
         this._totalTravel = count;
-        this.totalTravelDom.innerText = ""+Math.floor(count*1000)/1000;
+        this.totalTravelDom.innerText = "" + Math.floor(count * 1000) / 1000;
     },
-    get totalTravel(){
+    get totalTravel() {
         return this._totalTravel;
     },
     reset: function () {
@@ -363,17 +513,22 @@ Robot.prototype = {
         }
         return k_idx;
     },
-    addEdge: function (a, b) {
+    addEdge: function (a, b, color) {
         if (this.findEdge(a, b) !== false) {
+            graphDisplay.addLine(this.known_v[a].g_v_idx, this.known_v[b].g_v_idx, color);
             return;
         }
         var ei = this.known_e.length;
-        this.known_e.push({a: a, b: b, line: this.createLine(a, b)});
+        this.known_e.push({a: a, b: b});
         this.known_v[a].neighbors.add(ei);
         this.known_v[b].neighbors.add(ei);
-        this.updateGeometry();
+        graphDisplay.addLine(this.known_v[a].g_v_idx, this.known_v[b].g_v_idx, color);
+        if(this.algorithm != null)
+            this.algorithm.edgeUpdated(ei);
+        //this.updateGeometry();
     },
     createLine: function (a, b) {
+        console.error("deprecated");
         var u = this.known_v[a].g_v_idx;
         var v = this.known_v[b].g_v_idx;
         var line = createLine(u, v);
@@ -383,16 +538,29 @@ Robot.prototype = {
         return line;
     },
     updateGeometry: function () {
+        console.error("deprecated");
         if (this.mesh != null) {
             scene.remove(this.mesh);
             this.mesh = null;
         }
         if (this.known_e.length == 0)
             return;
-        this.mesh = new THREE.Object3D();
+        /*
+         this.mesh = new THREE.Object3D();
+         for (var i = 0; i < this.known_e.length; ++i) {
+         this.mesh.add(this.known_e[i].line);
+         }
+         */
+
+        var line_geom = new THREE.Geometry();
         for (var i = 0; i < this.known_e.length; ++i) {
-            this.mesh.add(this.known_e[i].line);
+            var a = this.known_v[this.known_e[i].a].g_v_idx;
+            var b = this.known_v[this.known_e[i].b].g_v_idx;
+            var v1 = new THREE.Vector3(-geometry.vertices[a].y, geometry.vertices[a].z, -geometry.vertices[a].x);
+            var v2 = new THREE.Vector3(-geometry.vertices[b].y, geometry.vertices[b].z, -geometry.vertices[b].x);
+            line_geom.vertices.push(v1, v2);
         }
+        this.mesh = new THREE.Line(line_geom, new THREE.LineBasicMaterial({color: 0xff0000}), THREE.LinePieces);
         scene.add(this.mesh);
     },
     findEdge: function (a, b) {
@@ -410,8 +578,9 @@ Robot.prototype = {
         return this.known_e[ei].a;
     },
     colorEdge: function (a, b, color) {
-        var ei = this.findEdge(a, b);
-        this.known_e[ei].line.material.color.setHex(color);
+        graphDisplay.addLine(a, b, color);
+        //var ei = this.findEdge(a, b);
+        //this.known_e[ei].line.material.color.setHex(color);
     },
     removeEdge: function (a, b) {
         var ei = this.findEdge(a, b);
@@ -430,36 +599,61 @@ Robot.prototype = {
             myarr.push({g_v: v, k_v: this.global2knownVertex(v)});
         }
         for (var i = 0; i < this.known_e.length; ++i) {
-            this.known_e[i].line.material.color.setHex(0x707070);
+            var a = this.known_v[this.known_e[i].a].g_v_idx;
+            var b = this.known_v[this.known_e[i].b].g_v_idx;
+            this.colorEdge(a, b, 0xA0A0A0);
         }
         for (var i = 0; i < vision.edges.length; ++i) {
             var a = this.global2knownVertex(vision.edges[i].a);
             var b = this.global2knownVertex(vision.edges[i].b);
-            this.addEdge(a, b);
-            var ei = this.findEdge(a, b);
-            this.known_e[ei].line.material.color.setHex(0x0000FF);
+            this.addEdge(a, b, 0x0000FF);
+            /*
+             this.addEdge(a, b);
+             var ei = this.findEdge(a, b);
+             this.known_e[ei].line.material.color.setHex(0x0000FF);
+             */
         }
     },
     stepAlgorithm: function () {
-        if(this.algorithm.state < 0)
+        if (this.algorithm.state < 0)
             return false;
         return this.algorithm.step();
     },
     middleStepAlgorithm: function () {
         var step = this.algorithm.middleStepCount;
-        var hasNext;
-        for (; this.algorithm.middleStepCount == step;) {
+        var hasNext = true;
+        for (; hasNext && this.algorithm.middleStepCount == step;) {
             hasNext = this.stepAlgorithm();
         }
         return hasNext;
     },
     majorStepAlgorithm: function () {
         var step = this.algorithm.majorStepCount;
-        var hasNext;
-        for (; this.algorithm.majorStepCount == step;) {
+        var hasNext = true;
+        for (; hasNext && this.algorithm.majorStepCount == step;) {
             hasNext = this.middleStepAlgorithm();
         }
         return hasNext;
+    },
+    pickGoal: function () {
+        controls.pickPoint(this);
+        this.controls_pickGoal.disabled = true;
+        this.controls_pickGoal.innerText = "Select point";
+        var robot = this;
+        this.controls_pickGoal.onclick = function () {
+            robot.pickFinish();
+        };
+    },
+    pointPicked: function (pointPicker) {
+        console.log(pointPicker);
+        this.controls_pickGoal.disabled = false;
+    },
+    pickFinish: function () {
+        controls.pickPoint();
+        this.controls_pickGoal.innerText = "Pick Goal";
+        this.controls_pickGoal.onclick = function () {
+            this.pickGoal();
+        };
     }
 };
 
@@ -536,7 +730,8 @@ algorithm_bfs.prototype = {
         return this._totalStepCount;
     },
     reset: function (goal) {
-        this.init(goal);
+        this.goal = goal;
+        this.state = 0;
     },
     step: function () {
         ++this.stepCount;
@@ -562,7 +757,7 @@ algorithm_bfs.prototype = {
                         console.info("BFS: blocked!");
                         return false;
                     }
-                    return false;
+                    return true;
                 }
                 this.cq = this.queue.shift();
                 this.iter = this.robot.known_v[this.cq.ki].neighbors.values();
@@ -592,7 +787,7 @@ algorithm_bfs.prototype = {
                             this.state = 3;
                             this.pathrev = nq;
                         } else {
-                            this.robot.colorEdge(nq.ki, nq.prev.ki, 0x00FF00);
+                            this.robot.colorEdge(ngi, this.robot.known_v[nq.prev.ki].g_v_idx, 0x00FF00);
                             this.queue.push(nq);// /or update cost
                             this.visited.add(nq.ki);
                             if (this.bestF == null || this.robot.known_v[nki].h + nq.c < this.robot.known_v[this.bestF.ki].h + this.bestF.c) {
@@ -606,7 +801,7 @@ algorithm_bfs.prototype = {
             case 3:
                 var q, lq;
                 for (q = this.pathrev, lq = q; q.prev != null; lq = q, q = q.prev) {
-                    this.robot.colorEdge(q.ki, q.prev.ki, 0xFF0000);
+                    this.robot.colorEdge(this.robot.known_v[q.ki].g_v_idx, this.robot.known_v[q.prev.ki].g_v_idx, 0xFF0000);
                 }
                 this.move_to = lq.ki;
                 this.state = 4;
@@ -638,11 +833,15 @@ algorithm_bfs.prototype = {
     },
     checkVision: function (vidx) {
         return geometry.vertices[this.robot.known_v[this.robot.c_v_k_idx].g_v_idx].distanceTo(geometry.vertices[vidx]) <= vision_range;
+    },
+    edgeUpdated: function (ei) {
+
     }
 };
 var algorithm_dstar = function (robot, goal) {
     this.robot = robot;
     this.goal = goal;
+    this.s_start = robot.c_v_k_idx;
     this.state = 0;
     this.majorStepCountDom = document.createElement("span");
     this.majorStepCountDom.style.textAlign = "right";
@@ -711,109 +910,167 @@ algorithm_dstar.prototype = {
     get totalStepCount() {
         return this._totalStepCount;
     },
-    reset: function (goal) {
-        this.init(goal);
+    resetGoal: function (goal) {
+        this.goal = goal;
+        this.state = 0;
     },
     step: function () {
         ++this.stepCount;
         ++this.totalStepCount;
         switch (this.state) {
             case 0:
-                this.queue = [];
-                this.visited = new Set();
-                var cq = {ki: this.robot.c_v_k_idx, c: 0, prev: null};
-                this.robot.known_v[cq.ki].h = Number.POSITIVE_INFINITY;
-                this.bestF = null;
-                this.queue.push(cq);
-                this.visited.add(cq.ki);
+                this.s_last = this.s_start;
+                this._init();
+                this._computeShortestPath();
                 this.state = 1;
+                break;
+            case 1:
+                var rStart = this.robot.known_v[this.s_start];
+                if(this.s_start == this.s_goal) {
+                    console.log("D*: finished (goal)");
+                    this.state = -2;
+                    return false;
+                }
+                if(rStart.g == Number.POSITIVE_INFINITY){
+                    console.info("D*: Blocked!");
+                }
+                var nextV = null;
+                var nextMin = null;
+                for(sPrim of rStart.neighbors){
+                    var rsPrim = this.robot.known_v[sPrim];
+                    var nowMin = this._c(this.s_start, sPrim)+rsPrim.g;
+                    if(nextMin == null || nowMin<nextMin){
+                        nextV = sPrim;
+                        nextMin = nowMin;
+                    }
+                }
+                this.updatedVertices = new Set();
+                this.state = 2;
+                this.robot.moveTo(nextV);
                 this.stepCount = 1;
                 return true;
                 break;
-            case 1:
-                if (this.queue.length == 0) {
-                    this.state = 3;
-                    this.pathrev = this.bestF;
-                    if (this.robot.known_v[this.bestF.ki].h + this.bestF.c == Number.POSITIVE_INFINITY) {
-                        console.info("BFS: blocked!");
-                        return false;
-                    }
-                    return false;
-                }
-                this.cq = this.queue.shift();
-                this.iter = this.robot.known_v[this.cq.ki].neighbors.values();
-                this.state = 2;
-                return true;
-                break;
             case 2:
-                var next = this.iter.next();
-                if (next.done) {
+                if(this.updatedVertices.size==0){
                     this.state = 1;
-                    ++this.middleStepCount;
-                } else {
-                    var nki = this.robot.neighborV(next.value, this.cq.ki);
-                    var ngi = this.robot.known_v[nki].g_v_idx;
-                    var cgi = this.robot.known_v[this.cq.ki].g_v_idx;
-                    var cost = edgeCost(cgi, ngi);
-                    var nq = {ki: nki, c: this.cq.c + cost, prev: this.cq};
-                    if (this.robot.known_v[nki].h != Number.POSITIVE_INFINITY) {
-                        var h = Number.POSITIVE_INFINITY;
-                        if (vision_range - nq.c <= 0.5) {
-                            h = this.vertexH(ngi);
-                        }
-                        this.robot.known_v[nki].h = h;
-                    }
-                    if (!this.visited.has(nki) && nq.c != Number.POSITIVE_INFINITY) {
-                        if (this.goal == ngi) {
-                            this.state = 3;
-                            this.pathrev = nq;
-                        } else {
-                            this.robot.colorEdge(nq.ki, nq.prev.ki, 0x00FF00);
-                            this.queue.push(nq);// /or update cost
-                            this.visited.add(nq.ki);
-                            if (this.bestF == null || this.robot.known_v[nki].h + nq.c < this.robot.known_v[this.bestF.ki].h + this.bestF.c) {
-                                this.bestF = nq;
-                            }
-                        }
-                    }
+                    break;
                 }
+                this.k_m += this._h(this.s_last, this.s_start);
+                this.s_last = this.s_start;
+                this.iter = this.updatedVertices.values();
+                this.state = 3;
                 return true;
                 break;
             case 3:
-                var q, lq;
-                for (q = this.pathrev, lq = q; q.prev != null; lq = q, q = q.prev) {
-                    this.robot.colorEdge(q.ki, q.prev.ki, 0xFF0000);
+                var next = this.iter.next();
+                if (next.done) {
+                    this.state = 4;
+                    ++this.middleStepCount;
+                } else {
+                    this._updateVertex(next.value);
                 }
-                this.move_to = lq.ki;
-                this.state = 4;
-                ++this.middleStepCount;
-                ++this.majorStepCount;
                 return true;
                 break;
             case 4:
-                this.robot.moveTo(this.move_to);
-                ++this.middleStepCount;
-                ++this.majorStepCount;
-                if (this.robot.known_v[this.move_to].g_v_idx == this.goal) {
-                    this.state = -2;
-                    console.info("BFS: finished (goal)");
-                    return false;
-                }
-                this.state = 0;//reset
+                this._computeShortestPath();
+                this.state = 1;
                 return true;
                 break;
             default:
                 this.state = -1;
-                console.error("BFS: crashed");
+                console.error("D*: crashed");
                 return false;
                 break;
         }
     },
     vertexH: function (vidx) {
-        return geometry.vertices[vidx].distanceTo(geometry.vertices[this.goal]);
+        return geometry.vertices[vidx].distanceTo(geometry.vertices[this.s_goal]);
     },
-    checkVision: function (vidx) {
-        return geometry.vertices[this.robot.known_v[this.robot.c_v_k_idx].g_v_idx].distanceTo(geometry.vertices[vidx]) <= vision_range;
+    edgeUpdated: function (ei) {
+        var a = this.robot.known_e[ei].a;
+        var b = this.robot.known_e[ei].b;
+        this.updatedVertices.set(a);
+        this.updatedVertices.set(b);
+    },
+    _min: function (a, b) {
+        return a<=b? a: b;
+    },
+    _calcKey: function (s) {
+        var rs = this.robot.known_v[s];
+        return [this._min(rs.g, rs.rhs)+this._h(this.s_start, s)+this.k_m, this._min(rs.g, rs.rhs)];
+    },
+    _init: function () {
+        this.s_goal = this.robot.global2knownVertex(this.goal);
+        this.U = new PriorityQueue(this._compare);
+        this.k_m = 0;
+        for(var i=0; i<this.robot.known_v.length; ++i){
+            this.robot.known_v[i].g = this.robot.known_v[i].rhs = Number.POSITIVE_INFINITY;
+        }
+        this.U.insertUpdate(this.s_goal, this._calcKey(this.s_goal));
+    },
+    _updateVertex: function (u) {
+        var ru = this.robot.known_v[u];
+        if(u != this.s_goal){
+            var minRHS = null;
+            for(sPrim of ru.neighbors){
+                var rsPrim = this.robot.known_v[sPrim];
+                var nowRHS = this._c(u, sPrim)+rsPrim.g;
+                if(minRHS == null || nowRHS<minRHS){
+                    minRHS = nowRHS;
+                }
+            }
+            ru.rhs = minRHS;
+        }
+        this.U.deleteNode(u);
+        if(ru.g != ru.rhs){
+            this.U.insertUpdate(u, this._calcKey(u));
+        }
+    },
+    _computeShortestPath: function () {
+        var topKey = this.U.peek().priority;
+        var rStart = this.robot.known_v[this.s_start];
+        var k_old;
+        var u;
+        var ru;
+        while(this._compare(topKey, this._calcKey(this.s_start)) || rStart.rhs != rStart.g) {
+            k_old = topKey;
+            u = this.U.pop().value;
+            ru = this.robot.known_v[u];
+            if(this._compare(k_old, this._calcKey(u))){
+                this.U.insertUpdate(u, this._calcKey(u));
+            }else if(ru.g > ru.rhs){
+                ru.g = ru.rhs;
+                for(s of ru.neighbors){
+                    this._updateVertex(s);
+                }
+            }else{
+                ru.g = Number.POSITIVE_INFINITY;
+                for(s of ru.neighbors){
+                    this._updateVertex(s);
+                }
+                this._updateVertex(u);
+            }
+        }
+    },
+    _compare: function (a, b) {
+        return a[0]<b[0] || a[0]==b[0] && a[1]<b[1];
+    },
+    _h: function (a, b) {
+        var ra = this.robot.known_v[a];
+        var rb = this.robot.known_v[b];
+        var ga = geometry.vertices[ra.g_v_idx];
+        var gb = geometry.vertices[rb.g_v_idx];
+        return ga.distanceTo(gb);
+    },
+    _c: function (a, b) {
+        var ra = this.robot.known_v[a];
+        var rb = this.robot.known_v[b];
+        if(!ra.neighbors.has(rb)){
+            return Number.POSITIVE_INFINITY;
+        }
+        var ga = geometry.vertices[ra.g_v_idx];
+        var gb = geometry.vertices[rb.g_v_idx];
+        return ga.distanceTo(gb);
     }
 };
 var algorithms = [{class: algorithm_bfs, name: "Breadth-First Search"}, {class: algorithm_dstar, name: "D*"}];
@@ -837,7 +1094,7 @@ robot2.mesh_r.children[0].material.color.setHex(0x0000FF);
 robot2.mesh_r.children[0].scale.y = 2;
 robot2.mesh_r.children[1].scale.y = 2;
 robot2.mesh_r.position.y += robot2.offset;
-robot2.mesh_r.children[2].position.y -= robot2.offset+0.1;
+robot2.mesh_r.children[2].position.y -= robot2.offset + 0.1;
 robot2.mesh_r.children[2].material.color.setHex(0x0000FF);
 robot2.mesh_r.children[2].material.wireframe = true;
 robot2.offset = 1;
@@ -845,10 +1102,9 @@ var robots_domElement = document.createElement("div");
 robots_domElement.style.cssText = "position: fixed; top: 0px; right: 0px; z-index: 1000;";
 robots_domElement.appendChild(robot1.domElement);
 robots_domElement.appendChild(robot2.domElement);
-function reset(elem) {
-    algorithm.reset(point_end.vertexidx);
-    robot1.mem.reset();
-}
+var info_domElement = document.createElement("div");
+info_domElement.style.cssText = "position: fixed; bottom: 0px; right: 0px; z-index: 1000; color: white";
+info_domElement.innerHTML = "<table style='float: right;'><tr><td>Move</td><td>W A S D</td></tr><tr><td>Up</td><td>SPACE</td></tr><tr><td>Down</td><td>SHIFT</td></tr><tr><td>Camera</td><td>LEFT CLICK DRAG</td></tr><tr><td>Select point</td><td>RIGHT CLICK</td></tr></table><br><div style='float:right;'>Sources at <a href=\"https://github.com/adysnook/lic3x\">https://github.com/adysnook/lic3x</a></div>";
 function blockRobot(robot, radius) {
     var gvidx = robot.mem.known_v[robot.mem.c_v_k_idx].g_v_idx;
     var gvi = robot.mem.known_v[robot.mem.c_v_k_idx].g_v_i;
@@ -900,7 +1156,7 @@ function animate(nowMsec) {
     var fd = frameDuration / 1000;
     stats.update(fd, !controls.hideAll);
     controls.update(fd);
-    autoPlayUpdate(nowMsec);
+    //autoPlayUpdate(nowMsec);
     renderer.render(scene, camera);
     myElem.innerHTML =
         "x: " +
@@ -912,6 +1168,7 @@ function animate(nowMsec) {
         "<br>z: " +
         Math.round(camera.position.z * 100) /
         100;
+    robots_domElement.style.display = myElem.style.display = controls.hideAll ? "none" : "block";
     lastTimeMsec = nowMsec;
     requestAnimationFrame(animate);
 }
@@ -930,5 +1187,6 @@ window.onload = function (e) {
     document.body.appendChild(stats.domElement);
     document.body.appendChild(myElem);
     document.body.appendChild(robots_domElement);
+    document.body.appendChild(info_domElement);
     requestAnimationFrame(init);
 };

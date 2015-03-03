@@ -1,4 +1,5 @@
-THREE.FirstPersonControls = function ( object, domElement ) {
+THREE.FirstPersonControls = function ( object, domElement, pointPicker ) {
+    this.pointPicker = pointPicker;
 	this.object = object;
 	this.target = new THREE.Vector3( 0, 0, 0 );
 	this.domElement = ( domElement !== undefined ) ? domElement : document;
@@ -33,6 +34,11 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 	this.hideAll = false;
 	this.domElement.requestPointerLock = this.domElement.requestPointerLock || this.domElement.mozRequestPointerLock || this.domElement.webkitRequestPointerLock;
 	this.domElement.exitPointerLock = this.domElement.exitPointerLock || this.domElement.mozExitPointerLock || this.domElement.webkitExitPointerLock;
+    this.raycaster = new THREE.Raycaster();
+    this.mouse = new THREE.Vector2();
+    this.pickingPoint = false;
+    this.pickingPointRobot = null;
+    this.pickingPointNow = false;
 	if ( this.domElement === document ) {
 		this.viewHalfX = window.innerWidth / 2;
 		this.viewHalfY = window.innerHeight / 2;
@@ -77,6 +83,11 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 		}
 	};
 	this.onMouseDown = function ( event ) {
+        event.preventDefault();
+        event.stopPropagation();
+        if(event.button == 0){//LEFT CLICK
+            this.mouseDragOn = true;
+        }
 		/*
 		if(!this.isPointerLocked){
 			// Ask the browser to lock the pointer
@@ -88,8 +99,6 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 		if ( this.domElement !== document ) {
 			this.domElement.focus();
 		}*/
-		event.preventDefault();
-		event.stopPropagation();
 		/*
 		if ( this.activeLook ) {
 			switch ( event.button ) {
@@ -98,11 +107,17 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 			}
 		}
 		*/
-		this.mouseDragOn = true;
+
 	};
 	this.onMouseUp = function ( event ) {
 		event.preventDefault();
 		event.stopPropagation();
+        if(event.button == 0){//LEFT CLICK
+            this.mouseDragOn = false;
+        }
+        if(event.button == 2 && this.pickingPoint){//RIGHT CLICK
+            this.pickingPointNow = true;
+        }
 		/*
 		if ( this.activeLook ) {
 			switch ( event.button ) {
@@ -111,15 +126,16 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 			}
 		}
 		*/
-		this.mouseDragOn = false;
 	};
 	this.onMouseMove = function ( event ) {
 		this.mouseX += event.movementX;
 		this.mouseY += event.movementY;
+        this.mouse.x = ( event.clientX / this.domElement.width ) * 2 - 1;
+        this.mouse.y = - ( event.clientY / this.domElement.height ) * 2 + 1;
 	};
 	this.onKeyDown = function ( event ) {
 		switch( event.keyCode ) {
-			case 17: /*CTRL*/ this.moveDown = true; break;
+			case 16: /*SHIFT*/ this.moveDown = true; break;
 			case 32: /*SPACE*/ this.moveUp = true; break;
 			case 37: /*left*/ this.moveLeft = true; break;
 			case 38: /*up*/ this.moveForward = true; break;
@@ -142,7 +158,7 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 	};
 	this.onKeyUp = function ( event ) {
 		switch( event.keyCode ) {
-			case 17: /*CTRL*/ this.moveDown = false; break;
+			case 16: /*SHIFT*/ this.moveDown = false; break;
 			case 32: /*SPACE*/ this.moveUp = false; break;
 			case 37: /*left*/ this.moveLeft = false; break;
 			case 38: /*up*/ this.moveForward = false; break;
@@ -209,8 +225,49 @@ THREE.FirstPersonControls = function ( object, domElement ) {
 		targetPosition.y = position.y + 100 * Math.cos( this.phi );
 		targetPosition.z = position.z + 100 * Math.sin( this.phi ) * Math.sin( this.theta );
 		this.object.lookAt( targetPosition );
-		this.mouseX = this.mouseY = 0;
-	};
+        this.raycaster.setFromCamera( this.mouse, this.object );
+        if(this.pickingPointNow) {
+            var intersects = this.raycaster.intersectObject(mesh);
+            // Toggle rotation bool for meshes that we clicked
+            if (intersects.length > 0) {
+                this.pointPicker.position.set(0, 0, 0);
+                //helper.lookAt( intersects[ 0 ].face.normal );
+                //align to grid
+                var point = new THREE.Vector3();
+                point.x = -intersects[0].point.z;
+                point.y = -intersects[0].point.x;
+                point.z = intersects[0].point.y;
+                var distA = point.distanceTo(geometry.vertices[intersects[0].face.a]);
+                var distB = point.distanceTo(geometry.vertices[intersects[0].face.b]);
+                var distC = point.distanceTo(geometry.vertices[intersects[0].face.c]);
+                var posMin = "a";
+                var distMin = distA;
+                if (distMin > distB) {
+                    distMin = distB;
+                    posMin = "b";
+                }
+                if (distMin > distC) {
+                    distMin = distC;
+                    posMin = "c";
+                }
+                var toPos = geometry.vertices[intersects[0].face[posMin]];
+                this.pointPicker.position.x = -toPos.y;
+                this.pointPicker.position.y = toPos.z;
+                this.pointPicker.position.z = -toPos.x;
+                this.pickingPointRobot.pointPicked(this.pointPicker);
+            }
+            this.pickingPointNow = false;
+        }
+        this.mouseX = this.mouseY = 0;
+    };
+    this.pickPoint = function (robot) {
+        this.pickingPointRobot = robot;
+        if(robot == null){
+            this.pickingPoint = false;
+            return;
+        }
+        this.pickingPoint = true;
+    };
 	this.domElement.addEventListener( 'contextmenu', function ( event ) { event.preventDefault(); }, false );
 	this.domElement.addEventListener( 'mousemove', bind( this, this.onMouseMove ), false );
 	this.domElement.addEventListener( 'mousedown', bind( this, this.onMouseDown ), false );
