@@ -230,6 +230,9 @@ PriorityQueue.prototype = {
             text += pre+this.nodeToString(c.info, pre+" ");
         }
         return text;
+    },
+    isEmpty: function(){
+        return this.length==0;
     }
 };
 var testpq = new PriorityQueue(function (a, b) {

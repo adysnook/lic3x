@@ -229,7 +229,7 @@ var graphDisplay = {
     linesByVerticesIndex: new Map(),
     addLine: function (a, b, color) {
         if (typeof color === "undefined") {
-            color = 0;
+            return;
         }
         var line = this.findLineByIndexes(a, b);
         if (line !== false) {
@@ -624,13 +624,6 @@ Robot.prototype = {
              this.known_e[ei].line.material.color.setHex(0x0000FF);
              */
         }
-        if(this._s_goal != null) {
-            for (var i = 0; i < myarr.length; ++i) {//goal imaginary edges
-                if (vision_range - gs.distanceTo(geometry.vertices[myarr[i].g_v]) < 0.5) {
-                    this.known_v[this._s_goal].neighbors.add(myarr[i].k_v);
-                }
-            }
-        }
     },
     stepAlgorithm: function () {
         if (this.algorithm.state < 0)
@@ -663,14 +656,18 @@ Robot.prototype = {
         };
     },
     pointPicked: function (pointPicker) {
-        console.log(pointPicker);
+        console.log(pointPicker.position);
+        console.log(geometry.vertices[pointPicker.pickedGeomPoint]);
         this.controls_pickGoal.disabled = false;
     },
     pickFinish: function () {
         controls.pickPoint();
+        point_end.object.position.copy(pointPicker.position);
+        this.goal = pointPicker.pickedGeomPoint;
         this.controls_pickGoal.innerText = "Pick Goal";
+        var robot = this;
         this.controls_pickGoal.onclick = function () {
-            this.pickGoal();
+            robot.pickGoal();
         };
     }
 };
@@ -955,7 +952,7 @@ algorithm_dstar.prototype = {
                 var nextV = null;
                 var nextMin = null;
                 for(sPrim of rStart.neighbors){
-                    var rsPrim = this.robot.known_v[sPrim];
+                    var rsPrim = this.robot.known_e[sPrim];
                     var nowMin = this._c(this.s_start, sPrim)+rsPrim.g;
                     if(nextMin == null || nowMin<nextMin){
                         nextV = sPrim;
@@ -1032,8 +1029,9 @@ algorithm_dstar.prototype = {
         if(u != this.s_goal){
             var minRHS = null;
             for(sPrim of ru.neighbors){
-                var rsPrim = this.robot.known_v[sPrim];
-                var nowRHS = this._c(u, sPrim)+rsPrim.g;
+                var nki = this.robot.neighborV(sPrim, u);
+                var rki = this.robot.known_v[nki];
+                var nowRHS = this._c(u, nki)+rki.g;
                 if(minRHS == null || nowRHS<minRHS){
                     minRHS = nowRHS;
                 }
@@ -1051,7 +1049,7 @@ algorithm_dstar.prototype = {
         var k_old;
         var u;
         var ru;
-        while(this._compare(topKey, this._calcKey(this.s_start)) || rStart.rhs != rStart.g) {
+        while(!this.U.isEmpty() && this._compare(topKey, this._calcKey(this.s_start)) || rStart.rhs != rStart.g) {
             k_old = topKey;
             u = this.U.pop().value;
             ru = this.robot.known_v[u];
@@ -1059,13 +1057,16 @@ algorithm_dstar.prototype = {
                 this.U.insertUpdate(u, this._calcKey(u));
             }else if(ru.g > ru.rhs){
                 ru.g = ru.rhs;
-                for(s of ru.neighbors){
-                    this._updateVertex(s);
+                for(s1 of ru.neighbors){
+                    var nki = this.robot.neighborV(s1, u);
+                    console.log(u+" "+s1+" "+nki);
+                    this._updateVertex(nki);
                 }
             }else{
                 ru.g = Number.POSITIVE_INFINITY;
-                for(s of ru.neighbors){
-                    this._updateVertex(s);
+                for(s2 of ru.neighbors){
+                    var nki = this.robot.neighborV(s2, u);
+                    this._updateVertex(nki);
                 }
                 this._updateVertex(u);
             }
@@ -1122,10 +1123,15 @@ robot2.mesh_r.children[2].position.y -= robot2.offset + 0.1;
 robot2.mesh_r.children[2].material.color.setHex(0x0000FF);
 robot2.mesh_r.children[2].material.wireframe = true;
 robot2.offset = 1;
+var autoPlayDomElement = document.createElement("button");
+autoPlayDomElement.style.float = "right";
+autoPlayDomElement.innerText = "Autoplay Robots";
+autoPlayDomElement.onclick = autoPlayToggle;
 var robots_domElement = document.createElement("div");
 robots_domElement.style.cssText = "position: fixed; top: 0px; right: 0px; z-index: 1000;";
 robots_domElement.appendChild(robot1.domElement);
 robots_domElement.appendChild(robot2.domElement);
+robots_domElement.appendChild(autoPlayDomElement);
 var info_domElement = document.createElement("div");
 info_domElement.style.cssText = "position: fixed; bottom: 0px; right: 0px; z-index: 1000; color: white";
 info_domElement.innerHTML = "<table style='float: right;'><tr><td>Move</td><td>W A S D</td></tr><tr><td>Up</td><td>SPACE</td></tr><tr><td>Down</td><td>SHIFT</td></tr><tr><td>Camera</td><td>LEFT CLICK DRAG</td></tr><tr><td>Select point</td><td>RIGHT CLICK</td></tr></table><br><div style='float:right;'>Sources at <a href=\"https://github.com/adysnook/lic3x\">https://github.com/adysnook/lic3x</a></div>";
@@ -1146,23 +1152,24 @@ function blockRobot(robot, radius) {
     recomputePlane();
 }
 //var auto_play_step_types = [stepAlgorithm, middleStepAlgorithm, majorStepAlgorithm];
-var auto_play_step_type = 0;
+//var auto_play_step_type = 0;
 var auto_play_enable = false;
 var auto_play_interval = 100;
 var auto_play_last = performance.now();
-function autoPlayStep(elem) {
+function autoPlayToggle() {
     auto_play_enable = !auto_play_enable;
 }
 function autoPlayUpdate(now) {
     if (auto_play_enable && now - auto_play_last >= auto_play_interval) {
-        auto_play_enable = auto_play_step_types[auto_play_step_type]();
+        robot1.majorStepAlgorithm();
         auto_play_last = now;
     }
 }
+/*
 function autoPlayStepType(elem) {
     auto_play_step_type = elem.selectedIndex;
 }
-
+*/
 myElem = document.createElement("div");
 myElem.style.cssText = "position:fixed; bottom:0px; left:0px; color: white;";
 var stats = new MYSTATS.Stats();
@@ -1180,7 +1187,7 @@ function animate(nowMsec) {
     var fd = frameDuration / 1000;
     stats.update(fd, !controls.hideAll);
     controls.update(fd);
-    //autoPlayUpdate(nowMsec);
+    autoPlayUpdate(nowMsec);
     renderer.render(scene, camera);
     myElem.innerHTML =
         "x: " +
