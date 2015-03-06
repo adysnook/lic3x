@@ -1,5 +1,6 @@
 THREE.FirstPersonControls = function ( object, domElement, pointPicker ) {
     this.pointPicker = pointPicker;
+    this.pointPicker.material.visible = false;
 	this.object = object;
 	this.target = new THREE.Vector3( 0, 0, 0 );
 	this.domElement = ( domElement !== undefined ) ? domElement : document;
@@ -251,6 +252,7 @@ THREE.FirstPersonControls = function ( object, domElement, pointPicker ) {
                     posMin = "c";
                 }
                 var toPos = geometry.vertices[intersects[0].face[posMin]];
+                this.pointPicker.pickedGeomPoint = intersects[0].face[posMin];
                 this.pointPicker.position.x = -toPos.y;
                 this.pointPicker.position.y = toPos.z;
                 this.pointPicker.position.z = -toPos.x;
@@ -264,9 +266,11 @@ THREE.FirstPersonControls = function ( object, domElement, pointPicker ) {
         this.pickingPointRobot = robot;
         if(robot == null){
             this.pickingPoint = false;
+            this.pointPicker.material.visible = false;
             return;
         }
         this.pickingPoint = true;
+        this.pointPicker.material.visible = true;
     };
 	this.domElement.addEventListener( 'contextmenu', function ( event ) { event.preventDefault(); }, false );
 	this.domElement.addEventListener( 'mousemove', bind( this, this.onMouseMove ), false );
