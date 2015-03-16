@@ -147,12 +147,12 @@ PriorityQueue.prototype = {
             return;
         }
         var node = this._valMap.get(value);
+        this._valMap.delete(value);
         for(var q=node.children.first; q!=null; q=q.next){
             this._cutChild(q.info);
         }
         this._cutChild(node);
         this._rootList.remove(node.rootNode);
-
         if(this._min == node){
             this._resetMin();
         }
@@ -168,10 +168,12 @@ PriorityQueue.prototype = {
             return;
         //delete min
         this._rootList.remove(this._min.rootNode);
+        this._valMap.delete(ret.value);
         //meld its children into root list
         for (var q = this._min.children.first; q != null; q = q.next) {
             this._rootList.insertAfter(null, q.info);
             var ln = this._rootList.first;
+            q.info.mark = false;
             q.info.parent = null;
             q.info.parentListNode = null;
             q.info.rootNode = ln;
@@ -202,6 +204,7 @@ PriorityQueue.prototype = {
             this._rootList.remove(lq);
             lq.info.rootNode = null;
             ++qi.rank;
+            qi.mark = false;
             qi.parent = null;
             qi.rootNode = q;
             q.info = qi;

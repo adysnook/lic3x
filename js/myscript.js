@@ -439,11 +439,11 @@ var Robot = function (start_index) {
     alg_sel_td_title.innerText = "Algorithm:";
     alg_sel_tr.appendChild(alg_sel_td_title);
     var alg_sel_td_val = document.createElement("td");
-    var algs_dom = getAlgsDom();
-    algs_dom.onchange = function () {
+    this.algs_dom = getAlgsDom();
+    this.algs_dom.onchange = function () {
         robot.algorithmIndex = this.selectedIndex;
     };
-    alg_sel_td_val.appendChild(algs_dom);
+    alg_sel_td_val.appendChild(this.algs_dom);
     alg_sel_tr.appendChild(alg_sel_td_val);
     table.appendChild(alg_sel_tr);
 
@@ -669,6 +669,9 @@ Robot.prototype = {
         this.controls_pickGoal.onclick = function () {
             robot.pickGoal();
         };
+    },
+    areNeighbors: function (a, b) {
+        return this.findEdge(a, b)!==false;
     }
 };
 
@@ -799,12 +802,14 @@ algorithm_bfs.prototype = {
                     }
                     if (!this.visited.has(nki) && nq.c != Number.POSITIVE_INFINITY) {
                         if (this.goal == ngi) {
-                            this.state = 3;
-                            this.pathrev = nq;
+                            if(this.bestF == null || nq.c <= this.robot.known_v[this.bestF.ki].h*2 + this.bestF.c*2){//*2 for return cost
+                                this.state = 3;
+                                this.pathrev = nq;
+                            }
                         } else {
+                            this.visited.add(nq.ki);
                             this.robot.colorEdge(ngi, this.robot.known_v[nq.prev.ki].g_v_idx, 0x00FF00);
                             this.queue.push(nq);// /or update cost
-                            this.visited.add(nq.ki);
                             if (this.bestF == null || this.robot.known_v[nki].h + nq.c < this.robot.known_v[this.bestF.ki].h + this.bestF.c) {
                                 this.bestF = nq;
                             }
@@ -938,6 +943,10 @@ algorithm_dstar.prototype = {
                 this._init();
                 this._computeShortestPath();
                 this.state = 1;
+                ++this.middleStepCount;
+                ++this.majorStepCount;
+                this._colorShorthesPath();
+                return true;
                 break;
             case 1:
                 var rStart = this.robot.known_v[this.s_start];
@@ -952,22 +961,31 @@ algorithm_dstar.prototype = {
                 var nextV = null;
                 var nextMin = null;
                 for(sPrim of rStart.neighbors){
-                    var rsPrim = this.robot.known_e[sPrim];
-                    var nowMin = this._c(this.s_start, sPrim)+rsPrim.g;
+                    var nsPrim = this.robot.neighborV(sPrim, this.s_start);
+                    var rsPrim = this.robot.known_v[nsPrim];
+                    var nowMin = this._c(this.s_start, nsPrim)+rsPrim.g;
                     if(nextMin == null || nowMin<nextMin){
-                        nextV = sPrim;
+                        nextV = nsPrim;
                         nextMin = nowMin;
                     }
                 }
                 this.updatedVertices = new Set();
                 this.state = 2;
                 this.robot.moveTo(nextV);
+                //console.log("D*: moveTo "+nextV);
+                this.s_start = nextV;
                 this.stepCount = 1;
+                ++this.middleStepCount;
+                ++this.majorStepCount;
                 return true;
                 break;
             case 2:
                 if(this.updatedVertices.size==0){
+                    ++this.middleStepCount;
+                    ++this.majorStepCount;
                     this.state = 1;
+                    this._colorShorthesPath();
+                    return true;
                     break;
                 }
                 this.k_m += this._h(this.s_last, this.s_start);
@@ -988,7 +1006,10 @@ algorithm_dstar.prototype = {
                 break;
             case 4:
                 this._computeShortestPath();
+                ++this.middleStepCount;
+                ++this.majorStepCount;
                 this.state = 1;
+                this._colorShorthesPath();
                 return true;
                 break;
             default:
@@ -1004,8 +1025,8 @@ algorithm_dstar.prototype = {
     edgeUpdated: function (ei) {
         var a = this.robot.known_e[ei].a;
         var b = this.robot.known_e[ei].b;
-        this.updatedVertices.set(a);
-        this.updatedVertices.set(b);
+        this.updatedVertices.add(a);
+        this.updatedVertices.add(b);
     },
     _min: function (a, b) {
         return a<=b? a: b;
@@ -1025,13 +1046,24 @@ algorithm_dstar.prototype = {
         this.U.insertUpdate(this.s_goal, this._calcKey(this.s_goal));
     },
     _updateVertex: function (u) {
+        //console.log(u);
         var ru = this.robot.known_v[u];
         if(u != this.s_goal){
             var minRHS = null;
+            var nki, rki, nowRHS;
             for(sPrim of ru.neighbors){
-                var nki = this.robot.neighborV(sPrim, u);
-                var rki = this.robot.known_v[nki];
-                var nowRHS = this._c(u, nki)+rki.g;
+                nki = this.robot.neighborV(sPrim, u);
+                //console.log(nki);
+                rki = this.robot.known_v[nki];
+                nowRHS = this._c(u, nki)+rki.g;
+                if(minRHS == null || nowRHS<minRHS){
+                    minRHS = nowRHS;
+                }
+            }
+            if (vision_range - this._h(this.robot.c_v_k_idx, u) <= 0.5) {
+                nki = this.robot.c_v_k_idx;
+                rki = this.robot.known_v[nki];
+                nowRHS = this._c(u, nki)+rki.g;
                 if(minRHS == null || nowRHS<minRHS){
                     minRHS = nowRHS;
                 }
@@ -1049,31 +1081,47 @@ algorithm_dstar.prototype = {
         var k_old;
         var u;
         var ru;
-        while(!this.U.isEmpty() && this._compare(topKey, this._calcKey(this.s_start)) || rStart.rhs != rStart.g) {
+        var gu;
+        while (!this.U.isEmpty() && (this._compare(topKey, this._calcKey(this.s_start)) || rStart.rhs != rStart.g)) {
             k_old = topKey;
             u = this.U.pop().value;
             ru = this.robot.known_v[u];
-            if(this._compare(k_old, this._calcKey(u))){
+            gu = ru.g_v_idx;
+            if (this._compare(k_old, this._calcKey(u))) {
                 this.U.insertUpdate(u, this._calcKey(u));
-            }else if(ru.g > ru.rhs){
+            } else if (ru.g > ru.rhs) {
                 ru.g = ru.rhs;
-                for(s1 of ru.neighbors){
+                for (s1 of ru.neighbors) {
                     var nki = this.robot.neighborV(s1, u);
-                    console.log(u+" "+s1+" "+nki);
+                    var ngi = this.robot.known_v[nki].g_v_idx;
+                    //console.log(u + " " + s1 + " " + nki);
                     this._updateVertex(nki);
+                    this.robot.colorEdge(gu, ngi, 0x00FF00);
                 }
-            }else{
+                /*
+                for (var i = 0; i < this.robot.known_v.length; ++i) {
+                    if (vision_range - this._h(i, u) <= 0.5) {
+                        this._updateVertex(i);
+                    }
+                }
+                */
+            } else {
                 ru.g = Number.POSITIVE_INFINITY;
-                for(s2 of ru.neighbors){
+                for (s2 of ru.neighbors) {
                     var nki = this.robot.neighborV(s2, u);
+                    var ngi = this.robot.known_v[nki].g_v_idx;
                     this._updateVertex(nki);
+                    this.robot.colorEdge(gu, ngi, 0x00FF00);
                 }
                 this._updateVertex(u);
+            }
+            if(!this.U.isEmpty()) {
+                topKey = this.U.peek().priority;
             }
         }
     },
     _compare: function (a, b) {
-        return a[0]<b[0] || a[0]==b[0] && a[1]<b[1];
+        return a[0]<b[0] || (a[0]==b[0] && a[1]<b[1]);
     },
     _h: function (a, b) {
         var ra = this.robot.known_v[a];
@@ -1091,11 +1139,42 @@ algorithm_dstar.prototype = {
         var ga = geometry.vertices[ra.g_v_idx];
         var gb = geometry.vertices[rb.g_v_idx];
         //var gs = geometry.vertices[this.robot.known_v[this.robot.c_v_k_idx].g_v_idx];
-        if(!ra.neighbors.has(b)){
+        if(!this.robot.areNeighbors(a, b)){
             return Number.POSITIVE_INFINITY;
         }
 
         return ga.distanceTo(gb);
+    },
+    _colorShorthesPath: function () {
+        //color edge
+        var visited = new Set();
+        visited.add(this.s_start);
+        var bestV;
+        var u;
+        for(u=this.s_start; u!=null && u!=this.s_goal; u=bestV){
+            var ru = this.robot.known_v[u];
+            var gu = ru.g_v_idx;
+            bestV = null;
+            var minG = null;
+            for(sX of ru.neighbors){
+                var nki = this.robot.neighborV(sX, u);
+                var rki = this.robot.known_v[nki];
+                var nowG = this._c(u, nki)+rki.g;
+                if((minG == null || nowG<minG) && !visited.has(nki)){
+                    minG = nowG;
+                    bestV = nki;
+                }
+            }
+            if(minG == Number.POSITIVE_INFINITY){
+                bestV = null;
+            }
+            if(bestV != null){
+                var gv = this.robot.known_v[bestV].g_v_idx;
+                this.robot.colorEdge(gu, gv, 0xFF0000);
+                visited.add(bestV);
+                //console.log("D*: color edge "+u+" "+bestV);
+            }
+        }
     }
 };
 var algorithms = [{class: algorithm_bfs, name: "Breadth-First Search"}, {class: algorithm_dstar, name: "D*"}];
@@ -1112,7 +1191,6 @@ var robot1 = new Robot(point_start.vertexidx);
 robot1.algorithmIndex = 0;
 robot1.goal = point_end.vertexidx;
 var robot2 = new Robot(point_start.vertexidx);
-robot2.algorithmIndex = 0;
 robot2.goal = point_end.vertexidx;
 robot2.domElement.childNodes[0].childNodes[0].childNodes[0].innerText = "Robot albastru";
 robot2.mesh_r.children[0].material.color.setHex(0x0000FF);
@@ -1123,15 +1201,40 @@ robot2.mesh_r.children[2].position.y -= robot2.offset + 0.1;
 robot2.mesh_r.children[2].material.color.setHex(0x0000FF);
 robot2.mesh_r.children[2].material.wireframe = true;
 robot2.offset = 1;
+robot2.algs_dom.selectedIndex = robot2.algorithmIndex = 1;
+//robot2.algsd// robot2.algorithmIndex = 1;
 var autoPlayDomElement = document.createElement("button");
 autoPlayDomElement.style.float = "right";
 autoPlayDomElement.innerText = "Autoplay Robots";
 autoPlayDomElement.onclick = autoPlayToggle;
+var pickBothDomElement = document.createElement("button");
+pickBothDomElement.style.float = "right";
+pickBothDomElement.innerText = "Pick Goal Both Robots";
+pickBothDomElement.pickGoal = function () {
+    var elem = this;
+    controls.pickPoint(this);
+    this.innerText = "Select Point";
+    this.disabled = true;
+    this.onclick = this.pickFinish;
+};
+pickBothDomElement.pointPicked = function (pointPicker) {
+    this.disabled = false;
+};
+pickBothDomElement.pickFinish = function () {
+    controls.pickPoint();
+    point_end.object.position.copy(pointPicker.position);
+    var goal = pointPicker.pickedGeomPoint;
+    robot1.goal = robot2.goal = goal;
+    this.innerText = "Pick Goal";
+    this.onclick = this.pickGoal;
+};
+pickBothDomElement.onclick = pickBothDomElement.pickGoal;
 var robots_domElement = document.createElement("div");
 robots_domElement.style.cssText = "position: fixed; top: 0px; right: 0px; z-index: 1000;";
 robots_domElement.appendChild(robot1.domElement);
 robots_domElement.appendChild(robot2.domElement);
 robots_domElement.appendChild(autoPlayDomElement);
+robots_domElement.appendChild(pickBothDomElement);
 var info_domElement = document.createElement("div");
 info_domElement.style.cssText = "position: fixed; bottom: 0px; right: 0px; z-index: 1000; color: white";
 info_domElement.innerHTML = "<table style='float: right;'><tr><td>Move</td><td>W A S D</td></tr><tr><td>Up</td><td>SPACE</td></tr><tr><td>Down</td><td>SHIFT</td></tr><tr><td>Camera</td><td>LEFT CLICK DRAG</td></tr><tr><td>Select point</td><td>RIGHT CLICK</td></tr></table><br><div style='float:right;'>Sources at <a href=\"https://github.com/adysnook/lic3x\">https://github.com/adysnook/lic3x</a></div>";
@@ -1162,6 +1265,9 @@ function autoPlayToggle() {
 function autoPlayUpdate(now) {
     if (auto_play_enable && now - auto_play_last >= auto_play_interval) {
         robot1.majorStepAlgorithm();
+        //robot1.majorStepAlgorithm();
+        robot2.majorStepAlgorithm();
+        //robot2.majorStepAlgorithm();
         auto_play_last = now;
     }
 }
@@ -1199,7 +1305,7 @@ function animate(nowMsec) {
         "<br>z: " +
         Math.round(camera.position.z * 100) /
         100;
-    robots_domElement.style.display = myElem.style.display = controls.hideAll ? "none" : "block";
+    info_domElement.style.display = robots_domElement.style.display = myElem.style.display = controls.hideAll ? "none" : "block";
     lastTimeMsec = nowMsec;
     requestAnimationFrame(animate);
 }
