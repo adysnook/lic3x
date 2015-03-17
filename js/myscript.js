@@ -379,6 +379,8 @@ var Robot = function (start_index) {
     this._totalTravel = 0;
     this.c_v_k_idx = this.global2knownVertex(start_index);
     this.status = "Ready";
+    this.bridgeVertices = new Set();
+    this.notBridgeVertices = new Set();
 
     this.domElement = document.createElement("div");
     this.domElement.style.border = "1px solid white";
@@ -521,11 +523,14 @@ Robot.prototype = {
         return k_idx;
     },
     addEdge: function (a, b, color) {
-        if (this.findEdge(a, b) !== false) {
+        var ei = this.findEdge(a, b);
+        if (ei !== false) {
             graphDisplay.addLine(this.known_v[a].g_v_idx, this.known_v[b].g_v_idx, color);
+            if(this.algorithm != null)
+                this.algorithm.edgeUpdated(ei);
             return;
         }
-        var ei = this.known_e.length;
+        ei = this.known_e.length;
         this.known_e.push({a: a, b: b});
         this.known_v[a].neighbors.add(ei);
         this.known_v[b].neighbors.add(ei);
@@ -599,6 +604,17 @@ Robot.prototype = {
         this.known_v[this.known_e[ei].b].neighbors.delete(ei);
         console.warn("removing edge references and line from scene. edge vector index not removed.");
     },
+    vertexUpdated: function (v) {
+        var dist = this._h(this.c_v_k_idx, v);
+        if(vision_range - dist < 0.5 && !this.notBridgeVertices.has(v)){
+            this.bridgeVertices.add(v);
+        }else{
+            this.bridgeVertices.delete(v);
+            this.notBridgeVertices.add(v);
+        }
+        if(this.algorithm!=null)
+            this.algorithm.vertexUpdated(v);
+    },
     updateVision: function () {
         var gsi = this.known_v[this.c_v_k_idx].g_v_idx;
         var gs = geometry.vertices[gsi];
@@ -606,6 +622,7 @@ Robot.prototype = {
         var myarr = [];
         for (v of vision.vertices) {
             myarr.push({g_v: v, k_v: this.global2knownVertex(v)});
+            this.vertexUpdated(this.global2knownVertex(v));
         }
         for (var i = 0; i < this.known_e.length; ++i) {
             var ga = this.known_v[this.known_e[i].a].g_v_idx;
@@ -672,7 +689,14 @@ Robot.prototype = {
     },
     areNeighbors: function (a, b) {
         return this.findEdge(a, b)!==false;
-    }
+    },
+    _h: function (a, b) {
+        var ra = this.known_v[a];
+        var rb = this.known_v[b];
+        var ga = geometry.vertices[ra.g_v_idx];
+        var gb = geometry.vertices[rb.g_v_idx];
+        return ga.distanceTo(gb);
+    },
 };
 
 /////////////BFS
@@ -854,15 +878,15 @@ algorithm_bfs.prototype = {
     checkVision: function (vidx) {
         return geometry.vertices[this.robot.known_v[this.robot.c_v_k_idx].g_v_idx].distanceTo(geometry.vertices[vidx]) <= vision_range;
     },
-    edgeUpdated: function (ei) {
-
-    }
+    edgeUpdated: function (ei) {},
+    vertexUpdated: function (v) {}
 };
 var algorithm_dstar = function (robot, goal) {
     this.robot = robot;
     this.goal = goal;
     this.s_start = robot.c_v_k_idx;
     this.state = 0;
+    this.updatedVertices = new Set();
     this.majorStepCountDom = document.createElement("span");
     this.majorStepCountDom.style.textAlign = "right";
     this.majorStepCountDom.innerText = "0";
@@ -971,9 +995,9 @@ algorithm_dstar.prototype = {
                 }
                 this.updatedVertices = new Set();
                 this.state = 2;
+                this.s_start = nextV;
                 this.robot.moveTo(nextV);
                 //console.log("D*: moveTo "+nextV);
-                this.s_start = nextV;
                 this.stepCount = 1;
                 ++this.middleStepCount;
                 ++this.majorStepCount;
@@ -986,7 +1010,6 @@ algorithm_dstar.prototype = {
                     this.state = 1;
                     this._colorShorthesPath();
                     return true;
-                    break;
                 }
                 this.k_m += this._h(this.s_last, this.s_start);
                 this.s_last = this.s_start;
@@ -1025,8 +1048,16 @@ algorithm_dstar.prototype = {
     edgeUpdated: function (ei) {
         var a = this.robot.known_e[ei].a;
         var b = this.robot.known_e[ei].b;
-        this.updatedVertices.add(a);
-        this.updatedVertices.add(b);
+    },
+    vertexUpdated: function (v) {
+        var ru = this.robot.known_v[v];
+        if(typeof ru.g === "undefined"){
+            ru.g = Number.POSITIVE_INFINITY;
+        }
+        if(typeof ru.rhs === "undefined"){
+            ru.rhs = Number.POSITIVE_INFINITY;
+        }
+        this.updatedVertices.add(v);
     },
     _min: function (a, b) {
         return a<=b? a: b;
@@ -1039,8 +1070,14 @@ algorithm_dstar.prototype = {
         this.s_goal = this.robot.global2knownVertex(this.goal);
         this.U = new PriorityQueue(this._compare);
         this.k_m = 0;
+        this.robot.bridgeVertices = new Set();
         for(var i=0; i<this.robot.known_v.length; ++i){
-            this.robot.known_v[i].g = this.robot.known_v[i].rhs = Number.POSITIVE_INFINITY;
+            var ru = this.robot.known_v[i];
+            ru.g = ru.rhs = Number.POSITIVE_INFINITY;
+            var dist = this._h(this.s_start, i);
+            if(vision_range - dist < 0.5){
+                this.robot.bridgeVertices.add(i);
+            }
         }
         this.robot.known_v[this.s_goal].rhs = 0;
         this.U.insertUpdate(this.s_goal, this._calcKey(this.s_goal));
@@ -1060,6 +1097,13 @@ algorithm_dstar.prototype = {
                     minRHS = nowRHS;
                 }
             }
+            if(this.robot.bridgeVertices.has(u)){
+                nowRHS = this._h(u, this.s_goal)*2;
+                if(minRHS == null || nowRHS<minRHS){
+                    minRHS = nowRHS;
+                }
+            }
+            /*
             if (vision_range - this._h(this.robot.c_v_k_idx, u) <= 0.5) {
                 nki = this.robot.c_v_k_idx;
                 rki = this.robot.known_v[nki];
@@ -1068,6 +1112,7 @@ algorithm_dstar.prototype = {
                     minRHS = nowRHS;
                 }
             }
+            */
             ru.rhs = minRHS;
         }
         this.U.deleteNode(u);
@@ -1098,6 +1143,11 @@ algorithm_dstar.prototype = {
                     this._updateVertex(nki);
                     this.robot.colorEdge(gu, ngi, 0x00FF00);
                 }
+                if(u == this.s_goal){
+                    for(s1p of this.robot.bridgeVertices){
+                        this._updateVertex(s1p);
+                    }
+                }
                 /*
                 for (var i = 0; i < this.robot.known_v.length; ++i) {
                     if (vision_range - this._h(i, u) <= 0.5) {
@@ -1112,6 +1162,11 @@ algorithm_dstar.prototype = {
                     var ngi = this.robot.known_v[nki].g_v_idx;
                     this._updateVertex(nki);
                     this.robot.colorEdge(gu, ngi, 0x00FF00);
+                }
+                if(u == this.s_goal){
+                    for(s1p of this.robot.bridgeVertices){
+                        this._updateVertex(s1p);
+                    }
                 }
                 this._updateVertex(u);
             }
@@ -1136,14 +1191,10 @@ algorithm_dstar.prototype = {
         }
         var ra = this.robot.known_v[a];
         var rb = this.robot.known_v[b];
-        var ga = geometry.vertices[ra.g_v_idx];
-        var gb = geometry.vertices[rb.g_v_idx];
-        //var gs = geometry.vertices[this.robot.known_v[this.robot.c_v_k_idx].g_v_idx];
         if(!this.robot.areNeighbors(a, b)){
             return Number.POSITIVE_INFINITY;
         }
-
-        return ga.distanceTo(gb);
+        return edgeCost(ra.g_v_idx, rb.g_v_idx);
     },
     _colorShorthesPath: function () {
         //color edge
@@ -1155,17 +1206,17 @@ algorithm_dstar.prototype = {
             var ru = this.robot.known_v[u];
             var gu = ru.g_v_idx;
             bestV = null;
-            var minG = null;
+            var minRHS = null;
             for(sX of ru.neighbors){
                 var nki = this.robot.neighborV(sX, u);
                 var rki = this.robot.known_v[nki];
-                var nowG = this._c(u, nki)+rki.g;
-                if((minG == null || nowG<minG) && !visited.has(nki)){
-                    minG = nowG;
+                var nowRHS = this._c(u, nki)+rki.g;
+                if((minRHS == null || nowRHS<minRHS) && !visited.has(nki)){
+                    minRHS = nowRHS;
                     bestV = nki;
                 }
             }
-            if(minG == Number.POSITIVE_INFINITY){
+            if(minRHS == Number.POSITIVE_INFINITY || (this.robot.bridgeVertices.has(bestV) && !this.robot.notBridgeVertices.has(bestV))){
                 bestV = null;
             }
             if(bestV != null){
@@ -1199,7 +1250,7 @@ robot2.mesh_r.children[1].scale.y = 2;
 robot2.mesh_r.position.y += robot2.offset;
 robot2.mesh_r.children[2].position.y -= robot2.offset + 0.1;
 robot2.mesh_r.children[2].material.color.setHex(0x0000FF);
-robot2.mesh_r.children[2].material.wireframe = true;
+//robot2.mesh_r.children[2].material.wireframe = true;
 robot2.offset = 1;
 robot2.algs_dom.selectedIndex = robot2.algorithmIndex = 1;
 //robot2.algsd// robot2.algorithmIndex = 1;
@@ -1225,7 +1276,7 @@ pickBothDomElement.pickFinish = function () {
     point_end.object.position.copy(pointPicker.position);
     var goal = pointPicker.pickedGeomPoint;
     robot1.goal = robot2.goal = goal;
-    this.innerText = "Pick Goal";
+    this.innerText = "Pick Goal Both Robots";
     this.onclick = this.pickGoal;
 };
 pickBothDomElement.onclick = pickBothDomElement.pickGoal;
@@ -1264,7 +1315,7 @@ function autoPlayToggle() {
 }
 function autoPlayUpdate(now) {
     if (auto_play_enable && now - auto_play_last >= auto_play_interval) {
-        robot1.majorStepAlgorithm();
+        //robot1.majorStepAlgorithm();
         //robot1.majorStepAlgorithm();
         robot2.majorStepAlgorithm();
         //robot2.majorStepAlgorithm();
