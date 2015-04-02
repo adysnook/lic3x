@@ -149,9 +149,9 @@ THREE.FirstPersonControls = function ( object, domElement, pointPicker ) {
 			case 84: /*T*/ break;
 			case 87: /*W*/ this.moveForward = true; break;
 			case 90: /*Z*/ this.hideAll=!this.hideAll; break;
-			case 96: /*NUM0*/ this.movementSpeed = 1.0; break;
 			case 107:/*NUM+*/ this.msH(); break;
 			case 109:/*NUM-*/ this.msL(); break;
+			case 110:/*NUM.*/ this.movementSpeed = 1.0; break;
 			default: /*console.log("D"+event.keyCode);*/ return;
 		}
 		event.preventDefault();
