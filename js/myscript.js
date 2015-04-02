@@ -696,7 +696,7 @@ Robot.prototype = {
         var ga = geometry.vertices[ra.g_v_idx];
         var gb = geometry.vertices[rb.g_v_idx];
         return ga.distanceTo(gb);
-    },
+    }
 };
 
 /////////////BFS
@@ -985,6 +985,7 @@ algorithm_dstar.prototype = {
                 var nextV = null;
                 var nextMin = null;
                 for(sPrim of rStart.neighbors){
+                    ++this.stepCount;++this.totalStepCount;
                     var nsPrim = this.robot.neighborV(sPrim, this.s_start);
                     var rsPrim = this.robot.known_v[nsPrim];
                     var nowMin = this._c(this.s_start, nsPrim)+rsPrim.g;
@@ -1072,6 +1073,7 @@ algorithm_dstar.prototype = {
         this.k_m = 0;
         this.robot.bridgeVertices = new Set();
         for(var i=0; i<this.robot.known_v.length; ++i){
+            ++this.stepCount;++this.totalStepCount;
             var ru = this.robot.known_v[i];
             ru.g = ru.rhs = Number.POSITIVE_INFINITY;
             var dist = this._h(this.s_start, i);
@@ -1080,7 +1082,9 @@ algorithm_dstar.prototype = {
             }
         }
         this.robot.known_v[this.s_goal].rhs = 0;
-        this.U.insertUpdate(this.s_goal, this._calcKey(this.s_goal));
+        var stepCount = this.U.insertUpdate(this.s_goal, this._calcKey(this.s_goal));
+        this.stepCount += stepCount;this.totalStepCount += stepCount;
+        ++this.stepCount;++this.totalStepCount;
     },
     _updateVertex: function (u) {
         //console.log(u);
@@ -1089,6 +1093,7 @@ algorithm_dstar.prototype = {
             var minRHS = null;
             var nki, rki, nowRHS;
             for(sPrim of ru.neighbors){
+                ++this.stepCount;++this.totalStepCount;
                 nki = this.robot.neighborV(sPrim, u);
                 //console.log(nki);
                 rki = this.robot.known_v[nki];
@@ -1115,9 +1120,11 @@ algorithm_dstar.prototype = {
             */
             ru.rhs = minRHS;
         }
-        this.U.deleteNode(u);
+        var stepCount = this.U.deleteNode(u);
+        this.stepCount += stepCount;this.totalStepCount += stepCount;
         if(ru.g != ru.rhs){
-            this.U.insertUpdate(u, this._calcKey(u));
+            stepCount = this.U.insertUpdate(u, this._calcKey(u));
+            this.stepCount += stepCount;this.totalStepCount += stepCount;
         }
     },
     _computeShortestPath: function () {
@@ -1128,15 +1135,20 @@ algorithm_dstar.prototype = {
         var ru;
         var gu;
         while (!this.U.isEmpty() && (this._compare(topKey, this._calcKey(this.s_start)) || rStart.rhs != rStart.g)) {
+            ++this.stepCount;++this.totalStepCount;
             k_old = topKey;
-            u = this.U.pop().value;
+            var pop = this.U.pop();
+            this.stepCount += pop.stepCount;this.totalStepCount += pop.stepCount;
+            u = pop.value;
             ru = this.robot.known_v[u];
             gu = ru.g_v_idx;
             if (this._compare(k_old, this._calcKey(u))) {
-                this.U.insertUpdate(u, this._calcKey(u));
+                var stepCount = this.U.insertUpdate(u, this._calcKey(u));
+                this.stepCount += stepCount;this.totalStepCount += stepCount;
             } else if (ru.g > ru.rhs) {
                 ru.g = ru.rhs;
                 for (s1 of ru.neighbors) {
+                    ++this.stepCount;++this.totalStepCount;
                     var nki = this.robot.neighborV(s1, u);
                     var ngi = this.robot.known_v[nki].g_v_idx;
                     //console.log(u + " " + s1 + " " + nki);
@@ -1145,6 +1157,7 @@ algorithm_dstar.prototype = {
                 }
                 if(u == this.s_goal){
                     for(s1p of this.robot.bridgeVertices){
+                        ++this.stepCount;++this.totalStepCount;
                         this._updateVertex(s1p);
                     }
                 }
@@ -1158,6 +1171,7 @@ algorithm_dstar.prototype = {
             } else {
                 ru.g = Number.POSITIVE_INFINITY;
                 for (s2 of ru.neighbors) {
+                    ++this.stepCount;++this.totalStepCount;
                     var nki = this.robot.neighborV(s2, u);
                     var ngi = this.robot.known_v[nki].g_v_idx;
                     this._updateVertex(nki);
@@ -1238,6 +1252,18 @@ function getAlgsDom() {
     }
     return sel;
 }
+var auto_play_enable = false;
+var auto_play_interval = 100;
+var auto_play_last = performance.now();
+function autoPlayUpdate(now) {
+    if (auto_play_enable && now - auto_play_last >= auto_play_interval) {
+        robot1.majorStepAlgorithm();
+        robot2.majorStepAlgorithm();
+        auto_play_last = now;
+    }
+}
+
+
 var robot1 = new Robot(point_start.vertexidx);
 robot1.algorithmIndex = 0;
 robot1.goal = point_end.vertexidx;
@@ -1254,10 +1280,27 @@ robot2.mesh_r.children[2].material.color.setHex(0x0000FF);
 robot2.offset = 1;
 robot2.algs_dom.selectedIndex = robot2.algorithmIndex = 1;
 //robot2.algsd// robot2.algorithmIndex = 1;
+var autoPlayIntervalInputDomElement = document.createElement("input");
+autoPlayIntervalInputDomElement.type = "number";
+autoPlayIntervalInputDomElement.value = auto_play_interval;
+autoPlayIntervalInputDomElement.onchange = function () {
+    auto_play_interval = autoPlayIntervalInputDomElement.value;
+};
+var autoPlayIntervalDomElement = document.createElement("div");
+autoPlayIntervalDomElement.innerText = "Autoplay Interval:";
+autoPlayIntervalDomElement.style.color = "white";
+autoPlayIntervalDomElement.appendChild(autoPlayIntervalInputDomElement);
 var autoPlayDomElement = document.createElement("button");
 autoPlayDomElement.style.float = "right";
 autoPlayDomElement.innerText = "Autoplay Robots";
-autoPlayDomElement.onclick = autoPlayToggle;
+autoPlayDomElement.onclick = function () {
+    auto_play_enable = !auto_play_enable;
+    if(auto_play_enable){
+        this.innerText = "Stop Autoplay";
+    }else{
+        this.innerText = "Autoplay Robots";
+    }
+};
 var pickBothDomElement = document.createElement("button");
 pickBothDomElement.style.float = "right";
 pickBothDomElement.innerText = "Pick Goal Both Robots";
@@ -1286,9 +1329,10 @@ robots_domElement.appendChild(robot1.domElement);
 robots_domElement.appendChild(robot2.domElement);
 robots_domElement.appendChild(autoPlayDomElement);
 robots_domElement.appendChild(pickBothDomElement);
+robots_domElement.appendChild(autoPlayIntervalDomElement);
 var info_domElement = document.createElement("div");
 info_domElement.style.cssText = "position: fixed; bottom: 0px; right: 0px; z-index: 1000; color: white";
-info_domElement.innerHTML = "<table style='float: right;'><tr><td>Move</td><td>W A S D</td></tr><tr><td>Up</td><td>SPACE</td></tr><tr><td>Down</td><td>SHIFT</td></tr><tr><td>Camera</td><td>LEFT CLICK DRAG</td></tr><tr><td>Select point</td><td>RIGHT CLICK</td></tr></table><br><div style='float:right;'>Sources at <a href=\"https://github.com/adysnook/lic3x\">https://github.com/adysnook/lic3x</a></div>";
+info_domElement.innerHTML = "<table style='float: right;'><tr><td>Move</td><td>W A S D</td></tr><tr><td>Up</td><td>SPACE</td></tr><tr><td>Down</td><td>SHIFT</td></tr><tr><td>Camera</td><td>LEFT CLICK DRAG</td></tr><tr><td>Select point</td><td>RIGHT CLICK</td></tr></table><br><div style='float:right;'>Sources at <a style='color:skyblue;' href=\"https://github.com/adysnook/lic3x\">https://github.com/adysnook/lic3x</a></div>";
 function blockRobot(robot, radius) {
     var gvidx = robot.mem.known_v[robot.mem.c_v_k_idx].g_v_idx;
     var gvi = robot.mem.known_v[robot.mem.c_v_k_idx].g_v_i;
@@ -1307,21 +1351,7 @@ function blockRobot(robot, radius) {
 }
 //var auto_play_step_types = [stepAlgorithm, middleStepAlgorithm, majorStepAlgorithm];
 //var auto_play_step_type = 0;
-var auto_play_enable = false;
-var auto_play_interval = 100;
-var auto_play_last = performance.now();
-function autoPlayToggle() {
-    auto_play_enable = !auto_play_enable;
-}
-function autoPlayUpdate(now) {
-    if (auto_play_enable && now - auto_play_last >= auto_play_interval) {
-        //robot1.majorStepAlgorithm();
-        //robot1.majorStepAlgorithm();
-        robot2.majorStepAlgorithm();
-        //robot2.majorStepAlgorithm();
-        auto_play_last = now;
-    }
-}
+
 /*
 function autoPlayStepType(elem) {
     auto_play_step_type = elem.selectedIndex;

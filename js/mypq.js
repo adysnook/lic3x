@@ -59,10 +59,12 @@ var PriorityQueue = function (priorityCompare) {//Fibonacci Heap
 PriorityQueue.prototype = {
     constructor: PriorityQueue,
     _cutChild: function(q){
+        var stepCount = 1;
         if(q.parent == null)
-            return;
+            return stepCount;
         var p = q.parent;
         do{
+            ++stepCount;
             //cut q
             p.children.remove(q.parentListNode);
             q.parentListNode = null;
@@ -70,6 +72,7 @@ PriorityQueue.prototype = {
             //update rank
             var rank = -1;
             for(var qi=p.children.first; qi!=null; qi=qi.next){
+                ++stepCount;
                 if(rank<qi.info.rank){
                     rank = qi.info.rank;
                 }
@@ -87,10 +90,13 @@ PriorityQueue.prototype = {
         } while (q.mark);
         if (p != null)
             q.mark = true;
+        return stepCount;
     },
     _resetMin: function(){
+        var stepCount = 1;
         var min = null;
         for (var q = this._rootList.first; q != null; q = q.next) {
+            ++stepCount;
             if (min == null || this._compare(q.info.key, min.info.key)) {
                 min = q;
             }
@@ -100,11 +106,13 @@ PriorityQueue.prototype = {
         } else {
             this._min = min.info;
         }
+        return stepCount;
     },
     has: function (value) {
         return (typeof this._valMap.get(value) !== "undefined");
     },
     insertUpdate: function (value, priority) {
+        var stepCount = 1;
         //if exists change key
         if (typeof this._valMap.get(value) !== "undefined") {
             var node = this._valMap.get(value);
@@ -122,6 +130,7 @@ PriorityQueue.prototype = {
             } else {
                 //increase-key
                 for(var q=node.children.first; q!=null; q=q.next){
+                    ++stepCount;
                     if(this._compare(q.info.key, node.key)){//heap order violated
                         this._cutChild(q.info);
                     }
@@ -130,7 +139,7 @@ PriorityQueue.prototype = {
                     this._resetMin();
             }
             //this._rootList.toString();
-            return;
+            return stepCount;
         }
         var node = {val: value, key: priority, rank: 0, children: new DoublyLinkedList(), mark: false, parent: null};
         this._valMap.set(value, node);
@@ -141,21 +150,24 @@ PriorityQueue.prototype = {
             this._min = node;
         }
         ++this.length;
+        return stepCount;
     },
     deleteNode: function(value) {
+        var stepCount = 2;
         if (typeof this._valMap.get(value) === "undefined") {
-            return;
+            return stepCount;
         }
         var node = this._valMap.get(value);
         this._valMap.delete(value);
         for(var q=node.children.first; q!=null; q=q.next){
-            this._cutChild(q.info);
+            stepCount += this._cutChild(q.info);
         }
-        this._cutChild(node);
+        stepCount += this._cutChild(node);
         this._rootList.remove(node.rootNode);
         if(this._min == node){
-            this._resetMin();
+            stepCount += this._resetMin();
         }
+        return stepCount;
     },
     peek: function () {
         if (this.length == 0)
@@ -165,12 +177,14 @@ PriorityQueue.prototype = {
     pop: function () {
         var ret = this.peek();
         if (typeof ret === "undefined")
-            return;
+            return {stepCount: 1};
+        ret.stepCount = 1;
         //delete min
         this._rootList.remove(this._min.rootNode);
         this._valMap.delete(ret.value);
         //meld its children into root list
         for (var q = this._min.children.first; q != null; q = q.next) {
+            ++ret.stepCount;
             this._rootList.insertAfter(null, q.info);
             var ln = this._rootList.first;
             q.info.mark = false;
@@ -182,6 +196,7 @@ PriorityQueue.prototype = {
         //consolidate trees, no two roots have same rank
         var rankArray = [];
         for (var q = this._rootList.first; q != null;) {
+            ++ret.stepCount;
             if (typeof rankArray[q.info.rank] === "undefined" || rankArray[q.info.rank] == null) {
                 rankArray[q.info.rank] = q;
                 q = q.next;
@@ -212,7 +227,7 @@ PriorityQueue.prototype = {
         }
         --this.length;
         //update min
-        this._resetMin();
+        ret.stepCount += this._resetMin();
         return ret;
     },
     toString: function () {
