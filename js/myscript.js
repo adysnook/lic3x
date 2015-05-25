@@ -40,11 +40,11 @@ controls.movementSpeed = 10;
     var light = new THREE.AmbientLight(0x202020);
     scene.add(light);
     // add a light in front
-    var light = new THREE.DirectionalLight('white', 0.8);
+    light = new THREE.DirectionalLight('white', 0.8);
     light.position.set(10, 40, 10);
     scene.add(light);
     // add a light behind
-    var light = new THREE.DirectionalLight('white', 0.4);
+    light = new THREE.DirectionalLight('white', 0.4);
     light.position.set(-10, 40, -10);
     //scene.add( light );
 })();
@@ -633,8 +633,8 @@ Robot.prototype = {
         for (var i = 0; i < this.known_e.length; ++i) {
             var ga = this.known_v[this.known_e[i].a].g_v_idx;
             var gb = this.known_v[this.known_e[i].b].g_v_idx;
-            graphDisplay.removeLine(ga, gb);
-            //this.colorEdge(ga, gb, 0xA0A0A0);
+            //graphDisplay.removeLine(ga, gb);
+            this.colorEdge(ga, gb, 0xA0A0A0);
         }
         for (var i = 0; i < vision.edges.length; ++i) {
             var ga = vision.edges[i].a;
