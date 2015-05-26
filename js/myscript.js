@@ -75,7 +75,7 @@ function recomputePlane() {
     THREEx.Terrain.heightMapToVertexColor(heightMap, geometry);
     computeNeighbors(geometry);
 }
-var vision_range = 2;
+var vision_range = 300;
 function changeVisionRange(range) {
     vision_range = range;
     sphere_range.geometry = new THREE.SphereGeometry(vision_range, 32, 32);
@@ -610,7 +610,6 @@ Robot.prototype = {
         var isPartial = vision_range - dist < 0.5;
         if(kvp.x != gvp.x || kvp.y != gvp.y || kvp.z != gvp.z || (!isPartial && this.bridgeVertices.has(v))) {
             kvp.x = gvp.x; kvp.y = gvp.y; kvp.z = gvp.z;
-
             if (isPartial) {
                 this.bridgeVertices.add(v);
             } else {
@@ -642,11 +641,6 @@ Robot.prototype = {
             var a = this.global2knownVertex(ga);
             var b = this.global2knownVertex(gb);
             this.addEdge(a, b, 0x0000FF);
-            /*
-             this.addEdge(a, b);
-             var ei = this.findEdge(a, b);
-             this.known_e[ei].line.material.color.setHex(0x0000FF);
-             */
         }
     },
     stepAlgorithm: function () {
