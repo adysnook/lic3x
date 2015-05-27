@@ -75,7 +75,7 @@ function recomputePlane() {
     THREEx.Terrain.heightMapToVertexColor(heightMap, geometry);
     computeNeighbors(geometry);
 }
-var vision_range = 300;
+var vision_range = 2;
 function changeVisionRange(range) {
     vision_range = range;
     sphere_range.geometry = new THREE.SphereGeometry(vision_range, 32, 32);
@@ -985,7 +985,7 @@ algorithm_wAs.prototype = {
                     this.state = 3;
                     this.pathrev = this.bestF;
                     if (/*this.robot.known_v[this.bestF.ki].h + */this.bestF.c == Number.POSITIVE_INFINITY) {
-                        console.info("BFS: blocked!");
+                        console.info("Weighted A*: blocked!");
                         return false;
                     }
                     return true;
@@ -1015,7 +1015,7 @@ algorithm_wAs.prototype = {
                     }
                     if (!this.visited.has(nki) && nq.c != Number.POSITIVE_INFINITY) {
                         if (this.goal == ngi) {
-                            if (this.bestF == null || nq.c <= this.robot.known_v[this.bestF.ki].h + this.bestF.c) {//*2 for return cost
+                            if (this.bestF == null || nq.c <= this.robot.known_v[this.bestF.ki].h*this.eps + this.bestF.c) {//*2 for return cost
                                 this.state = 3;
                                 this.pathrev = nq;
                             }
@@ -1051,7 +1051,7 @@ algorithm_wAs.prototype = {
                 ++this.majorStepCount;
                 if (this.robot.known_v[this.move_to].g_v_idx == this.goal) {
                     this.state = -2;
-                    console.info("BFS: finished (goal)");
+                    console.info("Weighted A*: finished (goal)");
                     return false;
                 }
                 this.state = 0;//reset
@@ -1059,7 +1059,7 @@ algorithm_wAs.prototype = {
                 break;
             default:
                 this.state = -1;
-                console.error("BFS: crashed");
+                console.error("Weighted A*: crashed");
                 return false;
                 break;
         }
