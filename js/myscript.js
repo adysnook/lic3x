@@ -1015,7 +1015,7 @@ algorithm_wAs.prototype = {
                     }
                     if (!this.visited.has(nki) && nq.c != Number.POSITIVE_INFINITY) {
                         if (this.goal == ngi) {
-                            if (this.bestF == null || nq.c <= this.robot.known_v[this.bestF.ki].h*this.eps + this.bestF.c) {//*2 for return cost
+                            if (this.bestF == null || nq.c <= this.robot.known_v[this.bestF.ki].h/* *this.eps */ + this.bestF.c) {//*2 for return cost
                                 this.state = 3;
                                 this.pathrev = nq;
                             }
@@ -1468,7 +1468,7 @@ algorithm_dstar.prototype = {
         }
     }
 };
-var algorithms = [{class: algorithm_bfs, name: "Breadth-First Search"}, {class: algorithm_wAs, name: "Weighted A*"}, {class: algorithm_dstar, name: "D*"}];
+var algorithms = [{class: algorithm_bfs, name: "Dijkstra"}, {class: algorithm_wAs, name: "Weighted A*"}, {class: algorithm_dstar, name: "D*"}];
 function getAlgsDom() {
     var sel = document.createElement("select");
     for (i = 0; i < algorithms.length; ++i) {
