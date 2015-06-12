@@ -699,9 +699,8 @@ Robot.prototype = {
         return ga.distanceTo(gb);
     }
 };
-
-/////////////BFS
-var algorithm_bfs = function (robot, goal) {
+/////////////Dijkstra
+var algorithm_dijkstra = function (robot, goal) {
     this.robot = robot;
     this.goal = goal;
     this.state = 0;
@@ -742,8 +741,8 @@ var algorithm_bfs = function (robot, goal) {
     row1.childNodes[1].appendChild(this.totalStepCountDom);
     this.domElement.appendChild(row1);
 };
-algorithm_bfs.prototype = {
-    constructor: algorithm_bfs,
+algorithm_dijkstra.prototype = {
+    constructor: algorithm_dijkstra,
     set majorStepCount(count) {
         this.majorStepCountDom.innerText = count;
         this._majorStepCount = count;
@@ -789,7 +788,7 @@ algorithm_bfs.prototype = {
                 this.queue.push(cq);
                 this.visited.add(cq.ki);
                 this.state = 1;
-                this.stepCount = 1;
+                this.stepCount = 1;this.zz = "";
                 return true;
                 break;
             case 1:
@@ -797,12 +796,22 @@ algorithm_bfs.prototype = {
                     this.state = 3;
                     this.pathrev = this.bestF;
                     if (/*this.robot.known_v[this.bestF.ki].h + */this.bestF.c == Number.POSITIVE_INFINITY) {
-                        console.info("BFS: blocked!");
+                        console.info("Dijkstra: blocked!");
                         return false;
                     }
                     return true;
                 }
-                this.cq = this.queue.shift();
+                var minC = 0;
+                var z = this.stepCount;
+                for(var i=1; i<this.queue.length; ++i){
+                    ++this.stepCount; ++this.totalStepCount;
+                    if(this.queue[i].c<this.queue[minC].c){
+                        minC = i;
+                    }
+                }
+                this.zz+=(this.stepCount-z)+" + ";
+                this.cq = this.queue[minC];
+                this.queue.splice(minC, 1);
                 this.iter = this.robot.known_v[this.cq.ki].neighbors.values();
                 this.state = 2;
                 return true;
@@ -863,7 +872,7 @@ algorithm_bfs.prototype = {
                 ++this.majorStepCount;
                 if (this.robot.known_v[this.move_to].g_v_idx == this.goal) {
                     this.state = -2;
-                    console.info("BFS: finished (goal)");
+                    console.info("Dijkstra: finished (goal)");
                     return false;
                 }
                 this.state = 0;//reset
@@ -871,7 +880,7 @@ algorithm_bfs.prototype = {
                 break;
             default:
                 this.state = -1;
-                console.error("BFS: crashed");
+                console.error("Dijkstra: crashed");
                 return false;
                 break;
         }
@@ -885,6 +894,211 @@ algorithm_bfs.prototype = {
     edgeUpdated: function (ei) {
     },
     vertexUpdated: function (v) {
+    }
+};
+/////////////Dijkstra Fibonacci Heap Priority Queue
+var algorithm_dijkstra_fibo = function (robot, goal) {
+    this.robot = robot;
+    this.goal = goal;
+    this.state = 0;
+    this.majorStepCountDom = document.createElement("span");
+    this.majorStepCountDom.style.textAlign = "right";
+    this.majorStepCountDom.innerText = "0";
+    this.middleStepCountDom = document.createElement("span");
+    this.middleStepCountDom.style.textAlign = "right";
+    this.middleStepCountDom.innerText = "0";
+    this.stepCountDom = document.createElement("span");
+    this.stepCountDom.style.textAlign = "right";
+    this.stepCountDom.innerText = "0";
+    this.totalStepCountDom = document.createElement("span");
+    this.totalStepCountDom.style.textAlign = "right";
+    this.totalStepCountDom.innerText = "0";
+    this._majorStepCount = 0;
+    this._middleStepCount = 0;
+    this._stepCount = 0;
+    this._totalStepCount = 0;
+    var row = document.createElement("tr");
+    var row_left = document.createElement("td");
+    row_left.style.textAlign = "right";
+    var row_right = document.createElement("td");
+    row.appendChild(row_left);
+    row.appendChild(row_right);
+    var row1 = $(row).clone()[0];
+    row1.childNodes[0].innerText = "Steps:";
+    row1.childNodes[1].appendChild(this.stepCountDom);
+    this.domElement = document.createElement("table");
+    this.domElement.style.color = "white";
+    this.domElement.appendChild(row1);
+    row1 = $(row).clone()[0];
+    row1.childNodes[0].innerText = "Major steps:";
+    row1.childNodes[1].appendChild(this.majorStepCountDom);
+    this.domElement.appendChild(row1);
+    row1 = $(row).clone()[0];
+    row1.childNodes[0].innerText = "Total steps:";
+    row1.childNodes[1].appendChild(this.totalStepCountDom);
+    this.domElement.appendChild(row1);
+};
+algorithm_dijkstra_fibo.prototype = {
+    constructor: algorithm_dijkstra_fibo,
+    set majorStepCount(count) {
+        this.majorStepCountDom.innerText = count;
+        this._majorStepCount = count;
+    },
+    get majorStepCount() {
+        return this._majorStepCount;
+    },
+    set middleStepCount(count) {
+        this.middleStepCountDom.innerText = count;
+        this._middleStepCount = count;
+    },
+    get middleStepCount() {
+        return this._middleStepCount;
+    },
+    set stepCount(count) {
+        this.stepCountDom.innerText = count;
+        this._stepCount = count;
+    },
+    get stepCount() {
+        return this._stepCount;
+    },
+    set totalStepCount(count) {
+        this.totalStepCountDom.innerText = count;
+        this._totalStepCount = count;
+    },
+    get totalStepCount() {
+        return this._totalStepCount;
+    },
+    reset: function (goal) {
+        this.goal = goal;
+        this.state = 0;
+    },
+    step: function () {
+        ++this.stepCount;
+        ++this.totalStepCount;
+        switch (this.state) {
+            case 0:
+                this.nqs = [];
+                this.queue = new PriorityQueue(this._compare);
+                this.visited = new Set();
+                var cq = {ki: this.robot.c_v_k_idx, c: 0, prev: null};
+                this.robot.known_v[cq.ki].h = Number.POSITIVE_INFINITY;
+                this.bestF = null;
+                var stepCount = this.queue.insertUpdate(cq, 0);
+                this.stepCount += stepCount; this.totalStepCount += stepCount;
+                this.visited.add(cq.ki);
+                this.state = 1;
+                this.stepCount = 1;
+                return true;
+                break;
+            case 1:
+                if (this.queue.length == 0) {
+                    this.state = 3;
+                    this.pathrev = this.bestF;
+                    if (/*this.robot.known_v[this.bestF.ki].h + */this.bestF.c == Number.POSITIVE_INFINITY) {
+                        console.info("Dijkstra Fibonacci: blocked!");
+                        return false;
+                    }
+                    return true;
+                }
+                var qp = this.queue.pop();
+                this.cq = qp.value;
+                this.stepCount += qp.stepCount; this.totalStepCount += qp.stepCount;
+                //console.log("po "+qp.stepCount);
+                this.iter = this.robot.known_v[this.cq.ki].neighbors.values();
+                this.state = 2;
+                return true;
+                break;
+            case 2:
+                var next = this.iter.next();
+                if (next.done) {
+                    this.state = 1;
+                    ++this.middleStepCount;
+                } else {
+                    var nki = this.robot.neighborV(next.value, this.cq.ki);
+                    var ngi = this.robot.known_v[nki].g_v_idx;
+                    var cgi = this.robot.known_v[this.cq.ki].g_v_idx;
+                    var cost = edgeCost(cgi, ngi);
+                    var nq = {ki: nki, c: this.cq.c + cost, prev: this.cq};
+                    if(typeof this.nqs[nki] == "undefined"){
+                        this.nqs[nki] = nq;
+                    }else{
+                        if(nq.c >= this.nqs[nki].c){
+                            return true;
+                        }
+                        this.nqs[nki] = nq;
+                    }
+                    if (this.robot.known_v[nki].h != Number.POSITIVE_INFINITY) {
+                        var h = Number.POSITIVE_INFINITY;
+                        if (vision_range - nq.c <= 0.5) {
+                            h = this.vertexH(ngi);
+                        }
+                        this.robot.known_v[nki].h = h;
+                    }
+                    if (!this.visited.has(nki) && nq.c != Number.POSITIVE_INFINITY) {
+                        if (this.goal == ngi) {
+                            if (this.bestF == null || nq.c <= this.robot.known_v[this.bestF.ki].h + this.bestF.c) {//*2 for return cost
+                                this.state = 3;
+                                this.pathrev = nq;
+                            }
+                        } else {
+                            this.visited.add(nq.ki);
+                            this.robot.colorEdge(ngi, this.robot.known_v[nq.prev.ki].g_v_idx, 0x00FF00);
+                            var stepCount = this.queue.insertUpdate(nq, nq.c);
+                            this.stepCount += stepCount; this.totalStepCount += stepCount;
+                            //console.log("in "+stepCount);
+                            if (this.robot.bridgeVertices.has(nki)) {
+                                if (this.bestF == null || this.vertexH(ngi) + nq.c < this.vertexH(this.robot.known_v[this.bestF.ki].g_v_idx) + this.bestF.c) {
+                                    //if (this.bestF == null || this.robot.known_v[nki].h + nq.c < this.robot.known_v[this.bestF.ki].h + this.bestF.c) {
+                                    this.bestF = nq;
+                                }
+                            }
+                        }
+                    }
+                }
+                return true;
+                break;
+            case 3:
+                var q, lq;
+                for (q = this.pathrev, lq = q; q.prev != null; lq = q, q = q.prev) {
+                    this.robot.colorEdge(this.robot.known_v[q.ki].g_v_idx, this.robot.known_v[q.prev.ki].g_v_idx, 0xFF0000);
+                }
+                this.move_to = lq.ki;
+                this.state = 4;
+                ++this.middleStepCount;
+                ++this.majorStepCount;
+                return true;
+                break;
+            case 4:
+                this.robot.moveTo(this.move_to);
+                ++this.middleStepCount;
+                ++this.majorStepCount;
+                if (this.robot.known_v[this.move_to].g_v_idx == this.goal) {
+                    this.state = -2;
+                    console.info("Dijkstra Fibonacci: finished (goal)");
+                    return false;
+                }
+                this.state = 0;//reset
+                return true;
+                break;
+            default:
+                this.state = -1;
+                console.error("Dijkstra Fibonacci: crashed");
+                return false;
+                break;
+        }
+    },
+    vertexH: function (vidx) {
+        return geometry.vertices[vidx].distanceTo(geometry.vertices[this.goal]);
+    },
+    checkVision: function (vidx) {
+        return geometry.vertices[this.robot.known_v[this.robot.c_v_k_idx].g_v_idx].distanceTo(geometry.vertices[vidx]) <= vision_range;
+    },
+    edgeUpdated: function (ei) {
+    },
+    vertexUpdated: function (v) {
+    },
+    _compare: function(a, b){
+        return a<b;
     }
 };
 /////////////Weighted A*
@@ -990,7 +1204,17 @@ algorithm_wAs.prototype = {
                     }
                     return true;
                 }
-                this.cq = this.queue.shift();
+                var minC = 0;
+                for(var i=1; i<this.queue.length; ++i){
+                    ++this.stepCount;
+                    var ingi = this.robot.known_v[this.queue[i].ki].g_v_idx;
+                    var mngi = this.robot.known_v[this.queue[minC].ki].g_v_idx;
+                    if(this.queue[i].c + this.vertexH(ingi) *this.eps <this.queue[minC].c + this.vertexH(mngi) *this.eps){
+                        minC = i;
+                    }
+                }
+                this.cq = this.queue[minC];
+                this.queue.splice(minC, 1);
                 this.iter = this.robot.known_v[this.cq.ki].neighbors.values();
                 this.state = 2;
                 return true;
@@ -1468,7 +1692,7 @@ algorithm_dstar.prototype = {
         }
     }
 };
-var algorithms = [{class: algorithm_bfs, name: "Dijkstra"}, {class: algorithm_wAs, name: "Weighted A*"}, {class: algorithm_dstar, name: "D*"}];
+var algorithms = [{class: algorithm_dijkstra, name: "Dijkstra"}, {class:algorithm_dijkstra_fibo, name:"Dijkstra: Fibonacci Heap pQueue"}, {class: algorithm_wAs, name: "Weighted A*"}, {class: algorithm_dstar, name: "D*"}];
 function getAlgsDom() {
     var sel = document.createElement("select");
     for (i = 0; i < algorithms.length; ++i) {
