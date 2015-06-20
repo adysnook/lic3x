@@ -1418,7 +1418,6 @@ algorithm_dstar.prototype = {
                 this.state = 2;
                 this.s_start = nextV;
                 this.robot.moveTo(nextV);
-                //console.log("D*: moveTo "+nextV);
                 this.stepCount = 1;
                 ++this.middleStepCount;
                 ++this.majorStepCount;
@@ -1548,16 +1547,6 @@ algorithm_dstar.prototype = {
                     minRHS = nowRHS;
                 }
             }
-            /*
-             if (vision_range - this._h(this.robot.c_v_k_idx, u) <= 0.5) {
-             nki = this.robot.c_v_k_idx;
-             rki = this.robot.known_v[nki];
-             nowRHS = this._c(u, nki)+rki.g;
-             if(minRHS == null || nowRHS<minRHS){
-             minRHS = nowRHS;
-             }
-             }
-             */
             ru.rhs = minRHS;
         }
         var stepCount = this.U.deleteNode(u);
